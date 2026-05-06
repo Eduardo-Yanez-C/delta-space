@@ -1,0 +1,34 @@
+{
+  "name": "delta-space",
+  "version": "0.1.4",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace web run dev",
+    "dev:api": "npm --workspace api run start:dev",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:desktop": "concurrently -k \"npm run dev:api\" \"npm run dev:web\" \"wait-on http://localhost:3000 -t 60000 && npm run dev --workspace=desktop\"",
+    "start:api": "npm --workspace api run start",
+    "start:web": "npm --workspace web run start",
+    "start:local": "concurrently \"npm run start:api\" \"npm run start:web\"",
+    "build": "npm --workspace api run build && npm --workspace web run build",
+    "ci:build": "npm run prisma:generate && npm run build --workspace=api && npm run build --workspace=web",
+    "build:desktop": "npm run build:lan-p2p && npm run build --workspace=api && cross-env BUILD_DESKTOP=1 NEXT_PUBLIC_API_URL=http://127.0.0.1:4000/api npm run build --workspace=web && npm run prepare-standalone --workspace=desktop && npm run download-node --workspace=desktop && npm run prepare-embedded-backend --workspace=desktop && npm run write-version --workspace=desktop && npm run build --workspace=desktop",
+    "build:desktop:release": "npm run build:lan-p2p && npm run build --workspace=api && cross-env BUILD_DESKTOP=1 NEXT_PUBLIC_API_URL=http://127.0.0.1:4000/api npm run build --workspace=web && npm run prepare-standalone --workspace=desktop && npm run download-node --workspace=desktop && npm run prepare-embedded-backend --workspace=desktop && npm run write-version --workspace=desktop && npm run build:release --workspace=desktop",
+    "build:desktop:clean": "npm run clean --workspace=desktop && npm run build:desktop",
+    "validate:desktop-portable": "npm run validate-portable --workspace=desktop",
+    "lint": "npm --workspace api run lint && npm --workspace web run lint",
+    "prisma:migrate": "npm --workspace api run prisma:migrate",
+    "prisma:generate": "npm --workspace api run prisma:generate",
+    "verify:lan-directory": "node scripts/collect-lan-directory-evidence.mjs",
+    "build:lan-p2p": "cargo build --release --manifest-path apps/lan-p2p/Cargo.toml"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.3",
+    "wait-on": "^7.2.0"
+  }
+}
+

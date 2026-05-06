@@ -1,0 +1,66 @@
+export type UpdateProductPanelSpecsDto = {
+    powerW?: number | null;
+    efficiencyPercent?: number | null;
+    vmpV?: number | null;
+    impA?: number | null;
+    vocV?: number | null;
+    iscA?: number | null;
+    bifacialityPercent?: number | null;
+    cellType?: string | null;
+    lengthMm?: number | null;
+    widthMm?: number | null;
+    heightMm?: number | null;
+    weightKg?: number | null;
+} | null;
+export type UpdateProductInverterSpecsDto = {
+    inverterType?: string | null;
+    powerAcW?: number | null;
+    maxPvVoltageV?: number | null;
+    startupVoltageV?: number | null;
+    mpptVoltageMinV?: number | null;
+    mpptVoltageMaxV?: number | null;
+    maxDcCurrentA?: number | null;
+    efficiencyPercent?: number | null;
+    connectionType?: string | null;
+    ipRating?: string | null;
+    communication?: string | null;
+} | null;
+export type UpdateProductBatterySpecsDto = {
+    capacityKwh?: number | null;
+    nominalVoltageV?: number | null;
+    maxChargeDischargePowerW?: number | null;
+    chemistry?: string | null;
+    cycles?: number | null;
+    weightKg?: number | null;
+    dimensionsMm?: string | null;
+} | null;
+export declare class UpdateProductDto {
+    internalCode?: string;
+    sku?: string;
+    categoryId?: number;
+    brandId?: number;
+    brandNameFree?: string | null;
+    modelId?: number;
+    modelNameFree?: string | null;
+    name?: string;
+    description?: string;
+    unit?: string;
+    purchaseUnit?: string;
+    technicalSheetUrl?: string;
+    realManufacturer?: string;
+    commercialStatus?: string;
+    defaultCurrency?: string;
+    warranty?: string;
+    leadTimeDays?: number;
+    stockReference?: string;
+    origin?: string;
+    internalNotes?: string;
+    primarySupplierId?: string | null;
+    technicalType?: string | null;
+    powerW?: number | null;
+    maxCurrentA?: number | null;
+    efficiencyPercent?: number | null;
+    panelSpecs?: UpdateProductPanelSpecsDto;
+    inverterSpecs?: UpdateProductInverterSpecsDto;
+    batterySpecs?: UpdateProductBatterySpecsDto;
+}

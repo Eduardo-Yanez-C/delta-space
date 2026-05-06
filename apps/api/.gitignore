@@ -1,0 +1,5 @@
+.env
+.env.local
+prisma/backups/*.sqlite
+prisma/backups/*.db
+/test-results/

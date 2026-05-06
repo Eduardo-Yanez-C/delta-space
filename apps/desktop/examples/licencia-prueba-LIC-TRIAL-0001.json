@@ -1,0 +1,12 @@
+{
+  "payload": {
+    "v": 1,
+    "kind": "renewal",
+    "licenseId": "LIC-TRIAL-0001",
+    "licenseType": "TRIAL_EXTENSION",
+    "validUntil": "2026-03-27T02:59:59.999Z",
+    "issuedAt": "2026-03-20T03:42:40.286Z",
+    "note": "Ejemplo: prueba comercial 5 dias habiles (BUILD_DESKTOP dev secret)"
+  },
+  "sig": "2b5a780c3f6099276920466beb4371701c2a4b224fadb38dcf974a37adacec7b"
+}

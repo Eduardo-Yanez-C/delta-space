@@ -1,0 +1,112 @@
+{
+  "name": "desktop",
+  "version": "0.1.4",
+  "description": "DELTA SPACE — aplicación de escritorio",
+  "author": "DELTA SPACE",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "prepare-standalone": "node scripts/copy-standalone.js",
+    "download-node": "node scripts/download-node-portable.js",
+    "write-version": "node scripts/write-version.js",
+    "prepare-embedded-backend": "node scripts/prepare-embedded-backend.js",
+    "prepare-transfer-folder": "node scripts/prepare-transfer-folder.js",
+    "copy-installer-to-dist": "node scripts/copy-installer-to-dist.js",
+    "prepare-offline-update-package": "node scripts/prepare-offline-update-package.js",
+    "clean-portable-userdata": "node scripts/clean-portable-userdata.js",
+    "clean": "node scripts/clean-dist-safe.js",
+    "validate-standalone": "node scripts/validate-standalone.js",
+    "validate-standalone:dist": "node scripts/validate-standalone.js dist/Cotizaciones-PFV-Portable/resources/standalone",
+    "validate-portable": "node scripts/validate-portable-cli.js",
+    "ensure-standalone-in-dist": "node scripts/ensure-standalone-in-dist.js",
+    "electron-build": "node scripts/run-electron-build.js",
+    "build": "node scripts/run-electron-build.js && node scripts/ensure-standalone-in-dist.js && node scripts/prepare-transfer-folder.js && node scripts/copy-installer-to-dist.js",
+    "build:release": "cross-env DESKTOP_RELEASE_SIGN=1 npm run build",
+    "build:with-offline-update": "npm run build && npm run prepare-offline-update-package"
+  },
+  "build": {
+    "appId": "cl.pvquoting.desktop",
+    "productName": "DELTA SPACE",
+    "electronVersion": "28.2.0",
+    "forceCodeSigning": false,
+    "afterSign": "scripts/after-sign-windows-resources.js",
+    "artifactName": "Cotizaciones-PFV-Setup-${version}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "spell-settings.js",
+      "installation.js",
+      "license-blocked.html",
+      "splash.html",
+      "license/**/*.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/.next/standalone",
+        "to": "standalone"
+      },
+      {
+        "from": "node-portable/win32-x64",
+        "to": "node"
+      },
+      {
+        "from": "embed-api",
+        "to": "backend"
+      },
+      {
+        "from": "version.txt",
+        "to": "."
+      },
+      {
+        "from": "../lan-p2p/target/release/lan-p2p.exe",
+        "to": "lan-p2p"
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "dir", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "include": "build/installer.nsh",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Cotizaciones PFV Avanzada",
+      "menuCategory": "Cotizaciones PFV Avanzada",
+      "uninstallDisplayName": "Cotizaciones PFV Avanzada ${version}",
+      "language": "3082",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ]
+    }
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "28.2.0",
+    "electron-builder": "^24.13.3",
+    "source-map-support": "^0.5.21"
+  }
+}

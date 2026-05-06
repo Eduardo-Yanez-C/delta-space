@@ -1,0 +1,8 @@
+# Playwright / QA release
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.auth/
+
+# E2E local (credenciales)
+.env.e2e.local

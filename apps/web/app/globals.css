@@ -1,0 +1,333 @@
+@import "../styles/accent-palettes.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sidebar-width: 12.5rem;
+  --header-height: 3.5rem;
+  /* Shell app (sidebar + fondo principal) — claro */
+  --app-shell-bg: #f8fafc;
+  --app-shell-sidebar-bg: #0a0e17;
+  --app-shell-main-from: #f1f5f9;
+  --app-shell-main-to: #ffffff;
+  /* Organigrama (alineado a Software de Mejora): superficie del diagrama */
+  --pmo-bg: #f1f5f9;
+  --pmo-surface: #ffffff;
+  --pmo-surface-2: #f8fafc;
+  --pmo-border: #e2e8f0;
+  --pmo-border-strong: #cbd5e1;
+  --pmo-text: #0f172a;
+  --pmo-text-muted: #64748b;
+  --pmo-accent: #0f172a;
+  --pmo-accent-soft: #1e293b;
+  --pmo-row-hover: rgba(15, 23, 42, 0.04);
+  --pmo-row-selected: rgba(14, 165, 233, 0.12);
+  --pmo-drawer-shadow: 0 0 0 1px rgba(15, 23, 42, 0.06), -12px 0 40px rgba(15, 23, 42, 0.12);
+  --pmo-radius-lg: 12px;
+  --pmo-radius-md: 8px;
+  --org-connector-stroke: #1e293b;
+  /* Cotización MARGIN: identidad violeta, tono comercial (no “uso interno”) */
+  --margin-quote-accent: #6d28d9;
+  --margin-quote-accent-rgb: 109 40 217;
+  --margin-quote-accent-foreground: #5b21b6;
+  --margin-quote-surface: #f5f3ff;
+  --margin-quote-border: #ddd6fe;
+  /* Suite / planificación (modo claro — mismos acentos) */
+  --suite-page-bg: #f8fafc;
+  --suite-surface: #ffffff;
+  --suite-surface-raised: #f1f5f9;
+  --suite-surface-input: #ffffff;
+  --suite-border: #e2e8f0;
+  --suite-border-subtle: #f1f5f9;
+  --suite-text: #0f172a;
+  --suite-text-muted: #64748b;
+  --suite-accent: #5b8cff;
+  --suite-accent-hover: #4a7ae8;
+  --suite-accent-soft: rgba(91, 140, 255, 0.1);
+  --suite-ring-track: #e2e8f0;
+  /* Texto secundario (jerarquía: subtítulos / subtareas en lista) */
+  --suite-text-secondary: #475569;
+  /* Pastillas de estado: siempre fg/bg emparejados (evita texto heredado ilegible) */
+  --suite-pill-todo-bg: #fef3c7;
+  --suite-pill-todo-fg: #78350f;
+  --suite-pill-active-bg: #e0f2fe;
+  --suite-pill-active-fg: #0c4a6e;
+  --suite-pill-done-bg: #d1fae5;
+  --suite-pill-done-fg: #065f46;
+  --suite-pill-fallback-bg: #f1f5f9;
+  --suite-pill-fallback-fg: #334155;
+}
+
+.dark {
+  /* Shell: negro uniforme (sin azul marino en sidebar / gradientes slate) */
+  --app-shell-bg: #000000;
+  --app-shell-sidebar-bg: #000000;
+  --app-shell-main-from: #000000;
+  --app-shell-main-to: #000000;
+  /* PMO / organigrama: mismo negro que el shell */
+  --pmo-bg: #000000;
+  --pmo-surface: #18181b;
+  --pmo-surface-2: #141416;
+  --pmo-border: #3f3f46;
+  --pmo-border-strong: #52525b;
+  --pmo-text: #fafafa;
+  --pmo-text-muted: #a1a1aa;
+  --pmo-accent: #e4e4e7;
+  --pmo-accent-soft: #d4d4d8;
+  --pmo-row-hover: rgba(250, 250, 250, 0.06);
+  --pmo-row-selected: rgba(91, 140, 255, 0.18);
+  --pmo-drawer-shadow: 0 0 0 1px rgba(63, 63, 70, 0.5), -12px 0 48px rgba(0, 0, 0, 0.5);
+  --org-connector-stroke: #a1a1aa;
+  --margin-quote-accent-foreground: #ddd6fe;
+  --margin-quote-surface: rgb(46 16 101 / 0.22);
+  --margin-quote-border: rgb(109 40 217 / 0.45);
+  /* Suite / planificación: sobre negro; superficies apenas elevadas */
+  --suite-page-bg: #000000;
+  --suite-surface: #0c0c0c;
+  --suite-surface-raised: #141414;
+  --suite-surface-input: #1a1a1a;
+  --suite-border: #333333;
+  --suite-border-subtle: #141414;
+  --suite-text: #e5e5e5;
+  --suite-text-muted: #a3a3a3;
+  --suite-text-secondary: #c4c4c4;
+  --suite-accent: #5b8cff;
+  --suite-accent-hover: #7c9fff;
+  --suite-accent-soft: rgba(91, 140, 255, 0.12);
+  --suite-ring-track: #404040;
+  /* Pastillas de estado: saturación alta sobre negro (clases .suite-status-pill) */
+  --suite-pill-todo-bg: #ca8a04;
+  --suite-pill-todo-fg: #fffbeb;
+  --suite-pill-active-bg: #0284c7;
+  --suite-pill-active-fg: #f0f9ff;
+  --suite-pill-done-bg: #16a34a;
+  --suite-pill-done-fg: #f0fdf4;
+  --suite-pill-fallback-bg: #262626;
+  --suite-pill-fallback-fg: #fafafa;
+  /* Badges auxiliares */
+  --suite-badge-danger-bg: #7f1d1d;
+  --suite-badge-danger-fg: #fecaca;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased dark:bg-[var(--app-shell-bg)] dark:text-zinc-100;
+}
+
+/**
+ * Barras de desplazamiento en modo oscuro (ventana + contenedores con overflow).
+ * Evita el thumb blanco del tema por defecto en Windows/WebKit.
+ */
+html.dark {
+  scrollbar-color: #52525b #0a0a0a;
+  scrollbar-width: thin;
+}
+html.dark * {
+  scrollbar-color: #52525b #141414;
+  scrollbar-width: thin;
+}
+html.dark *::-webkit-scrollbar,
+html.dark::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+html.dark *::-webkit-scrollbar-track,
+html.dark::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+html.dark *::-webkit-scrollbar-thumb,
+html.dark::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 6px;
+  border: 2px solid #0a0a0a;
+}
+html.dark *::-webkit-scrollbar-thumb:hover,
+html.dark::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/** Scroll lateral discreto (sidebar) — evita barra gruesa del navegador por defecto */
+.sidebar-scroll-discrete {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.28) transparent;
+}
+.sidebar-scroll-discrete::-webkit-scrollbar {
+  width: 5px;
+}
+.sidebar-scroll-discrete::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.28);
+  border-radius: 9999px;
+}
+.sidebar-scroll-discrete::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/** Scroll fino (listas PMO / planificación) — horizontal y vertical, modo claro y oscuro */
+.suite-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+}
+.suite-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.suite-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.35);
+  border-radius: 9999px;
+}
+.suite-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dark .suite-scroll {
+  scrollbar-color: rgba(148, 163, 184, 0.22) transparent;
+}
+.dark .suite-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.22);
+}
+
+.dark input:-webkit-autofill,
+.dark textarea:-webkit-autofill,
+.dark select:-webkit-autofill {
+  -webkit-text-fill-color: #e5e5e5;
+  box-shadow: 0 0 0px 1000px #262626 inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-primary-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-slate-900;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50 dark:border-slate-500 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-offset-slate-950;
+  }
+  .input-field {
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-500 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-400 dark:focus:border-primary-500 dark:focus:ring-primary-500;
+  }
+  .input-field-sm {
+    @apply block w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 placeholder-slate-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500;
+  }
+  .select-field-sm {
+    @apply block w-full cursor-pointer rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-primary-500 dark:focus:ring-primary-500;
+  }
+  .card {
+    @apply rounded-xl border border-slate-200/90 bg-white shadow-md dark:border-slate-700/80 dark:bg-slate-900/80;
+  }
+  .card-hover {
+    @apply transition-all duration-200 hover:border-slate-300 hover:bg-slate-50/40 hover:shadow-lg dark:hover:border-slate-500 dark:hover:bg-slate-800;
+  }
+  .glow-accent {
+    box-shadow: 0 0 18px -2px rgb(var(--pv-glow-rgb) / 0.38);
+  }
+  .alert-error {
+    @apply rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200;
+  }
+  .alert-success {
+    @apply rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200;
+  }
+  .alert-warning {
+    @apply rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200;
+  }
+
+  /** Borde lateral MARGIN en ficha comercial (detalle) */
+  .margin-quote-card-shell {
+    @apply border-l-[5px] border-l-violet-600 dark:border-l-violet-500;
+  }
+
+  /** Organigrama suite (mismo shell que Software de Mejora) */
+  .pmo-planning-shell {
+    background-color: var(--pmo-surface);
+    border: 1px solid var(--pmo-border);
+    border-radius: var(--pmo-radius-lg);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .pmo-btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white;
+  }
+
+  .pmo-btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-[var(--pmo-border)] bg-[var(--pmo-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--pmo-text)] shadow-sm transition hover:bg-[var(--pmo-surface-2)];
+  }
+
+  .pmo-btn-ghost {
+    @apply inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[var(--pmo-text-muted)] transition hover:bg-[var(--pmo-row-hover)] hover:text-[var(--pmo-text)];
+  }
+
+  /**
+   * Pastillas de estado de tarea (planificación / kanban).
+   * Definidas aquí porque Tailwind no escanea `lib/**` y las clases arbitrarias en TS no se generaban.
+   */
+  .suite-status-pill {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(15, 23, 42, 0.1);
+  }
+  .dark .suite-status-pill {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.22);
+  }
+  .suite-status-pill--todo {
+    background-color: var(--suite-pill-todo-bg);
+    color: var(--suite-pill-todo-fg);
+  }
+  .suite-status-pill--active {
+    background-color: var(--suite-pill-active-bg);
+    color: var(--suite-pill-active-fg);
+  }
+  .suite-status-pill--done {
+    background-color: var(--suite-pill-done-bg);
+    color: var(--suite-pill-done-fg);
+  }
+  .suite-status-pill--fallback {
+    background-color: var(--suite-pill-fallback-bg);
+    color: var(--suite-pill-fallback-fg);
+  }
+}
+
+/* Vista previa / impresión: ocultar navegación y acciones */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 9mm 11mm 9mm;
+  }
+  .no-print {
+    display: none !important;
+  }
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    background: #fff !important;
+  }
+  body {
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .dark body {
+    background: #fff;
+  }
+  * {
+    box-shadow: none !important;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-break-before {
+    break-before: page;
+    page-break-before: always;
+  }
+}

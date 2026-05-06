@@ -1,0 +1,10 @@
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\thread_local-daef956593c3bc77.d: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\cached.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\thread_id.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\unreachable.rs
+
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\libthread_local-daef956593c3bc77.rlib: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\cached.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\thread_id.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\unreachable.rs
+
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\libthread_local-daef956593c3bc77.rmeta: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\cached.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\thread_id.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\unreachable.rs
+
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\lib.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\cached.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\thread_id.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thread_local-1.1.9\src\unreachable.rs:

@@ -1,0 +1,14 @@
+export declare const ROLE_ADMIN_DEV = "ADMIN_DEV";
+export declare const ROLE_ADMIN = "ADMIN";
+export declare const ROLE_VENDEDOR_TECNICO = "VENDEDOR_TECNICO";
+export declare const ROLE_VENTAS_LEGACY = "VENTAS";
+export declare const ROLE_INGENIERIA = "INGENIERIA";
+export declare const ROLE_LECTURA = "LECTURA";
+export declare const ELEVATED_USER_MANAGEMENT_ROLES: Set<string>;
+export declare function expandRolesForGuard(roles: string[]): Set<string>;
+export declare function isAdminDev(roles: string[]): boolean;
+export declare function canManageElevatedUsers(roles: string[]): boolean;
+export declare function userRoleNamesHaveElevatedManagement(roleNames: string[]): boolean;
+export declare function hasGlobalAdminPrivileges(roles: string[]): boolean;
+export declare function hasSalesLikePrivileges(roles: string[]): boolean;
+export declare const OPERATIONAL_WRITE_ROLES: readonly ["ADMIN_DEV", "ADMIN", "VENDEDOR_TECNICO", "INGENIERIA", "VENTAS"];

@@ -1,0 +1,11 @@
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\base_x-347e96bc8449dbd8.d: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\alphabet.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\bigint.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\decoder.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\encoder.rs
+
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\libbase_x-347e96bc8449dbd8.rlib: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\alphabet.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\bigint.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\decoder.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\encoder.rs
+
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\libbase_x-347e96bc8449dbd8.rmeta: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\alphabet.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\bigint.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\decoder.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\encoder.rs
+
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\lib.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\alphabet.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\bigint.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\decoder.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\base-x-0.2.11\src\encoder.rs:

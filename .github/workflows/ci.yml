@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ci_test?schema=public
+      JWT_SECRET: ci-jwt-secret-minimum-32-characters-long-ok
+      WEB_ORIGIN: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:4000/api
+    services:
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ci_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma migrate deploy (valida SQL baseline Postgres)
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Prisma validate
+        working-directory: apps/api
+        run: npx prisma validate
+
+      - name: Prisma generate
+        run: npm run prisma:generate --workspace=api
+
+      - name: Release env check (API)
+        working-directory: apps/api
+        env:
+          RELEASE_VERIFY_STRICT: "1"
+        run: node scripts/verify-release-env.mjs
+
+      - name: DB integrity (release)
+        working-directory: apps/api
+        run: npm run integrity:db
+
+      - name: Build API
+        run: npm run build --workspace=api
+
+      - name: Build Web
+        run: npm run build --workspace=web
+
+      - name: Seed ADMIN_DEV (E2E)
+        working-directory: apps/api
+        run: npx ts-node prisma/recover-login.ts
+
+      - name: Install Playwright (Chromium)
+        working-directory: apps/web
+        run: npx playwright install chromium --with-deps
+
+      - name: E2E release QA
+        env:
+          E2E_ADMIN_EMAIL: eduardo.yanez.concha@gmail.com
+          E2E_ADMIN_PASSWORD: admin123
+          E2E_API_BASE_URL: http://127.0.0.1:4000/api
+        run: |
+          (cd apps/api && node dist/main.js &)
+          (cd apps/web && npm run start &)
+          npx wait-on http://127.0.0.1:4000/api/health http://127.0.0.1:3000 -t 120000
+          cd apps/web && npx playwright test

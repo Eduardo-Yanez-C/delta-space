@@ -1,0 +1,127 @@
+import { ClientsService } from "./clients.service";
+import { FvStudyService } from "../fv-study/fv-study.service";
+import { CreateClientDto } from "./dto/create-client.dto";
+import { UpdateClientDto } from "./dto/update-client.dto";
+export declare class ClientsController {
+    private readonly clientsService;
+    private readonly fvStudyService;
+    constructor(clientsService: ClientsService, fvStudyService: FvStudyService);
+    findAll(): Promise<{
+        id: string;
+        email: string | null;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        type: string;
+        taxId: string | null;
+        phone: string | null;
+        address: string | null;
+        notes: string | null;
+    }[]>;
+    findFvStudiesByClient(id: string): Promise<{
+        id: string;
+        clientId: string;
+        ownerId: string | null;
+        status: string;
+        title: string;
+        referenceMonth: number;
+        referenceBillAmount: number | null;
+        referenceConsumptionKwh: number | null;
+        valorKwhConsumo: number;
+        valorKwhInyeccion: number;
+        currency: string;
+        connectionType: string;
+        tipoProyecto: string;
+        potenciaSistemaKwp: number;
+        potenciaPorPanelWp: number;
+        coberturaDeseada: number;
+        hspDailyUsed: number;
+        performanceRatioUsed: number;
+        calculationMethodVersion: string;
+        cantidadPaneles: number;
+        generacionAnualKwh: number;
+        ahorroAnual: number;
+        porcentajeAhorro: number;
+        pagoResidualAnual: number;
+        generationSource: string;
+        solarResourceProvider: string | null;
+        latitude: number | null;
+        longitude: number | null;
+        mountingType: string | null;
+        tiltDegrees: number | null;
+        azimuthDegrees: number | null;
+        solarResourceRequestedAt: string | null;
+        solarResourceMetadata: string | null;
+        createdAt: string;
+        updatedAt: string;
+        client: {
+            id: string;
+            name: string;
+            email?: string | null;
+            address?: string | null;
+        } | undefined;
+        owner: {
+            id: string;
+            name: string | null;
+            email: string;
+        } | null | undefined;
+        months: {
+            id: string;
+            monthIndex: number;
+            consumptionKwh: number;
+            consumptionValue: number | null;
+            generationKwh: number;
+            generationValue: number | null;
+            savingsPercent: number | null;
+            estimatedPayment: number | null;
+        }[] | undefined;
+    }[]>;
+    findOne(id: string): Promise<{
+        id: string;
+        email: string | null;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        type: string;
+        taxId: string | null;
+        phone: string | null;
+        address: string | null;
+        notes: string | null;
+    }>;
+    create(dto: CreateClientDto): Promise<{
+        id: string;
+        email: string | null;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        type: string;
+        taxId: string | null;
+        phone: string | null;
+        address: string | null;
+        notes: string | null;
+    }>;
+    update(id: string, dto: UpdateClientDto): Promise<{
+        id: string;
+        email: string | null;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        type: string;
+        taxId: string | null;
+        phone: string | null;
+        address: string | null;
+        notes: string | null;
+    }>;
+    remove(id: string): Promise<{
+        id: string;
+        email: string | null;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        type: string;
+        taxId: string | null;
+        phone: string | null;
+        address: string | null;
+        notes: string | null;
+    }>;
+}

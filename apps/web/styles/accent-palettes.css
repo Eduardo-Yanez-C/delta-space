@@ -1,0 +1,172 @@
+/**
+ * Paletas de acento (primary en Tailwind → var(--pv-p*)).
+ * rgb de brillo para sombras (.glow-accent): --pv-glow-rgb
+ */
+
+:root {
+  --pv-p50: #fef9e7;
+  --pv-p100: #fdf0c3;
+  --pv-p200: #fbe89b;
+  --pv-p300: #f9df73;
+  --pv-p400: #f7d855;
+  --pv-p500: #f5d037;
+  --pv-p600: #e6bc2f;
+  --pv-p700: #d4a326;
+  --pv-p800: #c28a1e;
+  --pv-p900: #a36814;
+  --pv-glow-rgb: 245 208 55;
+}
+
+[data-accent-palette="dorado-metal"] {
+  --pv-p50: #fef9e7;
+  --pv-p100: #fdf0c3;
+  --pv-p200: #fbe89b;
+  --pv-p300: #f9df73;
+  --pv-p400: #f7d855;
+  --pv-p500: #f5d037;
+  --pv-p600: #e6bc2f;
+  --pv-p700: #d4a326;
+  --pv-p800: #c28a1e;
+  --pv-p900: #a36814;
+  --pv-glow-rgb: 245 208 55;
+}
+
+[data-accent-palette="naranjo-metal"] {
+  --pv-p50: #fff7ed;
+  --pv-p100: #ffedd5;
+  --pv-p200: #fed7aa;
+  --pv-p300: #fdba74;
+  --pv-p400: #fb923c;
+  --pv-p500: #ea580c;
+  --pv-p600: #c2410c;
+  --pv-p700: #9a3412;
+  --pv-p800: #7c2d12;
+  --pv-p900: #431407;
+  --pv-glow-rgb: 234 88 12;
+}
+
+[data-accent-palette="rojo-metal"] {
+  --pv-p50: #fef2f2;
+  --pv-p100: #fee2e2;
+  --pv-p200: #fecaca;
+  --pv-p300: #fca5a5;
+  --pv-p400: #f87171;
+  --pv-p500: #dc2626;
+  --pv-p600: #b91c1c;
+  --pv-p700: #991b1b;
+  --pv-p800: #7f1d1d;
+  --pv-p900: #450a0a;
+  --pv-glow-rgb: 220 38 38;
+}
+
+[data-accent-palette="azul-metal"] {
+  --pv-p50: #eff6ff;
+  --pv-p100: #dbeafe;
+  --pv-p200: #bfdbfe;
+  --pv-p300: #93c5fd;
+  --pv-p400: #60a5fa;
+  --pv-p500: #2563eb;
+  --pv-p600: #1d4ed8;
+  --pv-p700: #1e40af;
+  --pv-p800: #1e3a8a;
+  --pv-p900: #172554;
+  --pv-glow-rgb: 37 99 235;
+}
+
+[data-accent-palette="celeste-metal"] {
+  --pv-p50: #ecfeff;
+  --pv-p100: #cffafe;
+  --pv-p200: #a5f3fc;
+  --pv-p300: #67e8f9;
+  --pv-p400: #22d3ee;
+  --pv-p500: #0891b2;
+  --pv-p600: #0e7490;
+  --pv-p700: #155e75;
+  --pv-p800: #164e63;
+  --pv-p900: #083344;
+  --pv-glow-rgb: 8 145 178;
+}
+
+[data-accent-palette="verde-metal"] {
+  --pv-p50: #ecfdf5;
+  --pv-p100: #d1fae5;
+  --pv-p200: #a7f3d0;
+  --pv-p300: #6ee7b7;
+  --pv-p400: #34d399;
+  --pv-p500: #059669;
+  --pv-p600: #047857;
+  --pv-p700: #065f46;
+  --pv-p800: #064e3b;
+  --pv-p900: #022c22;
+  --pv-glow-rgb: 5 150 105;
+}
+
+[data-accent-palette="gris-metal"] {
+  --pv-p50: #f8fafc;
+  --pv-p100: #f1f5f9;
+  --pv-p200: #e2e8f0;
+  --pv-p300: #cbd5e1;
+  --pv-p400: #94a3b8;
+  --pv-p500: #64748b;
+  --pv-p600: #475569;
+  --pv-p700: #334155;
+  --pv-p800: #1e293b;
+  --pv-p900: #0f172a;
+  --pv-glow-rgb: 100 116 139;
+}
+
+[data-accent-palette="azul-klein"] {
+  --pv-p50: #e8eefc;
+  --pv-p100: #d2dcf9;
+  --pv-p200: #a8b8f0;
+  --pv-p300: #7b93e8;
+  --pv-p400: #4d6fd4;
+  --pv-p500: #002fa7;
+  --pv-p600: #002286;
+  --pv-p700: #001b6b;
+  --pv-p800: #00134d;
+  --pv-p900: #000c33;
+  --pv-glow-rgb: 0 47 167;
+}
+
+[data-accent-palette="cromatico-atardecer"] {
+  --pv-p50: #fff1f2;
+  --pv-p100: #ffe4e6;
+  --pv-p200: #fecdd3;
+  --pv-p300: #fda4af;
+  --pv-p400: #fb7185;
+  --pv-p500: #f97316;
+  --pv-p600: #ea580c;
+  --pv-p700: #c026d3;
+  --pv-p800: #86198f;
+  --pv-p900: #4c0519;
+  --pv-glow-rgb: 249 115 22;
+}
+
+[data-accent-palette="cromatico-brisa"] {
+  --pv-p50: #f0fdfa;
+  --pv-p100: #ccfbf1;
+  --pv-p200: #99f6e4;
+  --pv-p300: #5eead4;
+  --pv-p400: #2dd4bf;
+  --pv-p500: #0d9488;
+  --pv-p600: #6366f1;
+  --pv-p700: #4f46e5;
+  --pv-p800: #4338ca;
+  --pv-p900: #312e81;
+  --pv-glow-rgb: 13 148 136;
+}
+
+[data-accent-palette="complementario-ambar-indigo"] {
+  --pv-p50: #fffbeb;
+  --pv-p100: #fef3c7;
+  --pv-p200: #fde68a;
+  --pv-p300: #fcd34d;
+  --pv-p400: #fbbf24;
+  --pv-p500: #d97706;
+  --pv-p600: #4f46e5;
+  --pv-p700: #4338ca;
+  --pv-p800: #3730a3;
+  --pv-p900: #312e81;
+  --pv-glow-rgb: 217 119 6;
+}

@@ -1,0 +1,12 @@
+{
+  "payload": {
+    "v": 1,
+    "kind": "renewal",
+    "licenseId": "LIC-INTERNAL-DEMO-001",
+    "licenseType": "INTERNAL",
+    "validUntil": "2031-01-02T02:59:59.000Z",
+    "issuedAt": "2026-03-20T01:49:30.919Z",
+    "note": "Prueba interna ejemplo"
+  },
+  "sig": "b5c45ba7d7ced817ce66128e2b7b0506ee2f6238f736d3b6bed03c93208aafcf"
+}

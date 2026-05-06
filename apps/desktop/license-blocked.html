@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Licencia — DELTA SPACE</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+      color: #e2e8f0;
+      padding: 24px;
+    }
+    .card {
+      max-width: 480px;
+      width: 100%;
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 12px; color: #f8fafc; }
+    p { margin: 0 0 14px; line-height: 1.5; font-size: 0.95rem; color: #94a3b8; }
+    .reason { font-size: 0.85rem; color: #fbbf24; margin-bottom: 16px; }
+    button {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .primary { background: #d97706; color: #fff; }
+    .primary:hover { background: #b45309; }
+    .secondary { background: transparent; color: #94a3b8; border: 1px solid #475569; }
+    .secondary:hover { background: #334155; color: #e2e8f0; }
+    .msg { font-size: 0.8rem; margin-top: 12px; min-height: 1.2em; }
+    .msg.ok { color: #4ade80; }
+    .msg.err { color: #f87171; }
+    .hint { font-size: 0.8rem; color: #64748b; margin-bottom: 14px; line-height: 1.45; }
+    .license-ref { font-size: 0.85rem; color: #cbd5e1; margin-bottom: 12px; font-family: ui-monospace, monospace; word-break: break-all; }
+    .install-id { font-size: 0.75rem; color: #64748b; margin-bottom: 14px; line-height: 1.4; }
+    .divider {
+      border: none;
+      border-top: 1px solid #334155;
+      margin: 20px 0 16px;
+    }
+    details.dev-panel { margin-top: 4px; }
+    details.dev-panel > summary {
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      list-style: none;
+      padding: 8px 0;
+    }
+    details.dev-panel > summary::-webkit-details-marker { display: none; }
+    details.dev-panel > summary::before {
+      content: "▸ ";
+      color: #94a3b8;
+    }
+    details.dev-panel[open] > summary::before { content: "▾ "; }
+    .dev-inner { padding-top: 4px; }
+    .dev-inner p { font-size: 0.85rem; }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-bottom: 4px;
+      margin-top: 10px;
+    }
+    label:first-of-type { margin-top: 0; }
+    input[type="email"],
+    input[type="password"],
+    input[type="number"] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #f1f5f9;
+      font-size: 0.9rem;
+    }
+    input:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    input:focus {
+      outline: none;
+      border-color: #d97706;
+      box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.25);
+    }
+    .btn-dev {
+      margin-top: 14px;
+      background: #334155;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+    }
+    .btn-dev:hover:not(:disabled) { background: #475569; }
+    .btn-dev:disabled { opacity: 0.5; cursor: not-allowed; }
+    .dev-note { font-size: 0.75rem; color: #64748b; margin-top: 10px; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Licencia requerida</h1>
+    <p id="desc">
+      En este equipo aún no hay licencia registrada, o la anterior ya no es válida.
+      Seleccione el <strong>archivo de licencia</strong> entregado por el administrador (primera instalación o renovación).
+      No escriba códigos a mano: la licencia es un archivo (.json o .lic) que usted recibe y guarda en su equipo.
+    </p>
+    <p class="hint">
+      Formatos aceptados: <strong>.json</strong>, <strong>.lic</strong>. La licencia debe incluir en el archivo firmado el mismo
+      <strong>ID de instalación</strong> que muestra esta pantalla y una fecha de vencimiento (<strong>validUntil</strong>).
+      Si el archivo fue editado, la firma fallará; use el archivo tal como se lo enviaron.
+    </p>
+    <p class="reason" id="detail"></p>
+    <p class="license-ref" id="licenseRef" hidden></p>
+    <p class="install-id" id="installIdBlock" hidden>
+      <strong>ID de instalación</strong> (para solicitar licencia al proveedor):<br />
+      <span id="installIdText"></span>
+    </p>
+    <button type="button" class="primary" id="btnFile">Seleccionar licencia</button>
+    <hr class="divider" />
+    <details class="dev-panel" id="devPanel">
+      <summary>Acceso desarrollador</summary>
+      <div class="dev-inner">
+        <p id="devIntro">
+          Con el instalador que incluye la API en este mismo PC, puede activar una licencia temporal sin archivos:
+          ingrese su <strong>correo y contraseña</strong> (cuenta <strong>ADMIN_DEV</strong> en el sistema), elija los días y pulse el botón.
+          La validación ocurre en la API local; la contraseña no se guarda. Si usa otro emisor, el administrador define la URL con variable de entorno.
+        </p>
+        <p class="dev-note" id="devNotConfigured" hidden>
+          No hay API embebida ni URL de emisor configurada. Use «Seleccionar licencia» o defina
+          <code style="color:#94a3b8">DESKTOP_DEV_LICENSE_ISSUER_URL</code> (solo instalaciones especiales).
+        </p>
+        <form id="devForm" autocomplete="on" hidden>
+          <label for="devEmail">Correo</label>
+          <input type="email" id="devEmail" name="email" autocomplete="username" required disabled />
+          <label for="devPassword">Contraseña</label>
+          <input type="password" id="devPassword" name="password" autocomplete="current-password" required disabled />
+          <label for="devDays">Días de licencia</label>
+          <input type="number" id="devDays" name="days" min="1" max="30" value="7" required disabled />
+          <button type="submit" class="btn-dev" id="btnDev" disabled>Solicitar licencia temporal</button>
+        </form>
+        <p class="dev-note" id="devMaxHint" hidden></p>
+        <button type="button" class="btn-dev" id="btnHmacDiag">Diagnóstico HMAC (Electron vs API embebida)</button>
+        <pre id="hmacDiagOut" class="dev-note" style="white-space: pre-wrap; max-height: 220px; overflow: auto; display: none; margin-top: 10px; font-size: 0.72rem"></pre>
+      </div>
+    </details>
+    <button type="button" class="secondary" id="btnQuit">Salir</button>
+    <p class="msg" id="msg"></p>
+  </div>
+  <script>
+    const detail = document.getElementById("detail");
+    const msg = document.getElementById("msg");
+    const api = window.__DESKTOP__ && window.__DESKTOP__.license;
+    const desk = window.__DESKTOP__;
+    const licenseRef = document.getElementById("licenseRef");
+    if (desk && desk.getInstallationId) {
+      desk.getInstallationId().then(function (r) {
+        if (r && r.installationId) {
+          document.getElementById("installIdBlock").hidden = false;
+          document.getElementById("installIdText").textContent = r.installationId;
+        }
+      });
+    }
+    if (api && api.getStatus) {
+      api.getStatus().then(function (s) {
+        if (s && s.detail) detail.textContent = s.detail;
+        if (s && s.licenseId) {
+          licenseRef.hidden = false;
+          var extra = "Referencia en sistema: " + s.licenseId;
+          if (s.licenseType) extra += " · " + s.licenseType;
+          if (s.issuedTo) extra += " · " + s.issuedTo;
+          licenseRef.textContent = extra;
+        }
+      });
+    }
+    document.getElementById("btnFile").onclick = function () {
+      msg.textContent = "";
+      msg.className = "msg";
+      if (!api || !api.selectAndApply) {
+        msg.textContent = "No se pudo comunicar con la aplicación.";
+        msg.className = "msg err";
+        return;
+      }
+      api.selectAndApply().then(function (r) {
+        if (r && r.ok) {
+          msg.textContent = r.licenseId
+            ? "Licencia " + r.licenseId + " aplicada. Reiniciando…"
+            : "Licencia aplicada. Reiniciando…";
+          msg.className = "msg ok";
+          setTimeout(function () {
+            if (!api.relaunch) return;
+            api.relaunch().catch(function () {
+              msg.textContent =
+                "Licencia aplicada. Cierre la aplicación manualmente y vuelva a abrirla para continuar.";
+              msg.className = "msg ok";
+            });
+          }, 600);
+        } else if (r && r.cancelled) {
+          msg.textContent = "";
+        } else {
+          msg.textContent = r && r.message ? r.message : "No se pudo aplicar la licencia.";
+          msg.className = "msg err";
+        }
+      });
+    };
+    document.getElementById("btnQuit").onclick = function () {
+      if (api && api.quit) api.quit();
+    };
+
+    (function initDeveloperPanel() {
+      var devForm = document.getElementById("devForm");
+      var devEmail = document.getElementById("devEmail");
+      var devPassword = document.getElementById("devPassword");
+      var devDays = document.getElementById("devDays");
+      var btnDev = document.getElementById("btnDev");
+      var devNotConfigured = document.getElementById("devNotConfigured");
+      var devMaxHint = document.getElementById("devMaxHint");
+      if (!api || !api.isDeveloperIssuerConfigured || !api.requestDeveloperLicense) return;
+      api
+        .isDeveloperIssuerConfigured()
+        .then(function (cfg) {
+          var maxD = cfg && typeof cfg.maxDays === "number" ? cfg.maxDays : 30;
+          devDays.max = maxD;
+          devDays.min = 1;
+          if (parseInt(devDays.value, 10) > maxD) devDays.value = String(maxD);
+          devMaxHint.textContent =
+            "Máximo permitido por esta app: " + maxD + " días. El servidor puede aplicar límites adicionales.";
+          if (cfg && cfg.configured) {
+            devEmail.disabled = false;
+            devPassword.disabled = false;
+            devDays.disabled = false;
+            btnDev.disabled = false;
+            devNotConfigured.hidden = true;
+            devForm.hidden = false;
+            devMaxHint.hidden = false;
+          } else {
+            devNotConfigured.hidden = false;
+            devForm.hidden = true;
+            devMaxHint.hidden = true;
+          }
+        })
+        .catch(function () {
+          devNotConfigured.hidden = false;
+          devNotConfigured.textContent =
+            "No se pudo consultar la configuración del emisor. Use «Seleccionar licencia» o reinicie la aplicación.";
+          devForm.hidden = true;
+        });
+      devForm.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        msg.textContent = "";
+        msg.className = "msg";
+        if (btnDev.disabled) return;
+        var days = parseInt(devDays.value, 10);
+        if (isNaN(days) || days < 1) {
+          msg.textContent = "Indique una cantidad de días válida.";
+          msg.className = "msg err";
+          return;
+        }
+        btnDev.disabled = true;
+        api
+          .requestDeveloperLicense({
+            email: devEmail.value.trim(),
+            password: devPassword.value,
+            days: days,
+          })
+          .then(function (r) {
+            btnDev.disabled = false;
+            if (r && r.ok) {
+              devPassword.value = "";
+              msg.textContent = r.licenseId
+                ? "Licencia " + r.licenseId + " aplicada. Reiniciando…"
+                : "Licencia temporal aplicada. Reiniciando…";
+              msg.className = "msg ok";
+              setTimeout(function () {
+                if (!api.relaunch) return;
+                api.relaunch().catch(function () {
+                  msg.textContent =
+                    "Licencia aplicada. Cierre la aplicación manualmente y vuelva a abrirla para continuar.";
+                  msg.className = "msg ok";
+                });
+              }, 600);
+            } else {
+              msg.textContent = r && r.message ? r.message : "No se pudo obtener la licencia.";
+              msg.className = "msg err";
+            }
+          })
+          .catch(function () {
+            btnDev.disabled = false;
+            msg.textContent =
+              "No se pudo contactar al emisor de licencias (red, URL del emisor o servidor no disponible). Revise conexión y vuelva a intentar.";
+            msg.className = "msg err";
+          });
+      });
+      function formatHmacDiagForUser(d) {
+        var lines = [];
+        lines.push("Diagnóstico HMAC (licencia de escritorio)");
+        lines.push("");
+        if (d && typeof d === "object") {
+          if (d.aligned === true) {
+            lines.push("Estado: la huella de esta aplicación coincide con la del servidor. La clave HMAC debería ser la misma en ambos lados.");
+          } else if (d.aligned === false) {
+            lines.push(
+              "Estado: NO alineado. La app y el servidor no comparten la misma huella o el servidor no respondió bien. Revise que DESKTOP_LICENSE_HMAC_SECRET (o equivalente) sea idéntico en Electron y en la API.",
+            );
+          } else {
+            lines.push("Estado: no se pudo determinar la alineación.");
+          }
+          if (d.installationId) lines.push("ID de instalación en esta PC: " + d.installationId);
+          lines.push("");
+          if (d.electron && typeof d.electron === "object") {
+            lines.push("En esta aplicación:");
+            if (d.electron.fingerprintSha256Prefix16)
+              lines.push("  Huella (inicio SHA-256): " + d.electron.fingerprintSha256Prefix16);
+            if (d.electron.readFailed) lines.push("  No se pudo leer la configuración HMAC local.");
+            lines.push("");
+          }
+          if (d.nest && typeof d.nest === "object") {
+            lines.push("Respuesta del servidor de diagnóstico:");
+            if (d.nest.error) lines.push("  Error: " + d.nest.error);
+            if (d.nest.httpStatus) lines.push("  HTTP: " + d.nest.httpStatus);
+            if (d.nest.fingerprintSha256Prefix16)
+              lines.push("  Huella en servidor (inicio SHA-256): " + d.nest.fingerprintSha256Prefix16);
+            lines.push("");
+          }
+        }
+        lines.push("--- Detalle técnico (JSON, para soporte) ---");
+        lines.push(JSON.stringify(d, null, 2));
+        return lines.join("\n");
+      }
+      var btnHmac = document.getElementById("btnHmacDiag");
+      var hmacOut = document.getElementById("hmacDiagOut");
+      if (btnHmac && api && api.getHmacAlignmentDiag) {
+        btnHmac.onclick = function () {
+          hmacOut.style.display = "block";
+          hmacOut.textContent = "Consultando…";
+          api
+            .getHmacAlignmentDiag()
+            .then(function (d) {
+              hmacOut.textContent = formatHmacDiagForUser(d);
+            })
+            .catch(function () {
+              hmacOut.textContent =
+                "No se pudo obtener el diagnóstico. Compruebe que la API esté en marcha y que la ruta de depuración de licencia esté habilitada.";
+            });
+        };
+      } else if (btnHmac) {
+        btnHmac.hidden = true;
+      }
+    })();
+  </script>
+</body>
+</html>

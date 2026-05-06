@@ -1,0 +1,66 @@
+export type CreateProductPanelSpecsDto = {
+    powerW?: number;
+    efficiencyPercent?: number;
+    vmpV?: number;
+    impA?: number;
+    vocV?: number;
+    iscA?: number;
+    bifacialityPercent?: number;
+    cellType?: string;
+    lengthMm?: number;
+    widthMm?: number;
+    heightMm?: number;
+    weightKg?: number;
+};
+export type CreateProductInverterSpecsDto = {
+    inverterType?: string;
+    powerAcW?: number;
+    maxPvVoltageV?: number;
+    startupVoltageV?: number;
+    mpptVoltageMinV?: number;
+    mpptVoltageMaxV?: number;
+    maxDcCurrentA?: number;
+    efficiencyPercent?: number;
+    connectionType?: string;
+    ipRating?: string;
+    communication?: string;
+};
+export type CreateProductBatterySpecsDto = {
+    capacityKwh?: number;
+    nominalVoltageV?: number;
+    maxChargeDischargePowerW?: number;
+    chemistry?: string;
+    cycles?: number;
+    weightKg?: number;
+    dimensionsMm?: string;
+};
+export declare class CreateProductDto {
+    internalCode?: string;
+    sku?: string;
+    categoryId: number;
+    brandId?: number;
+    brandNameFree?: string;
+    modelId?: number;
+    modelNameFree?: string;
+    name: string;
+    description?: string;
+    unit: string;
+    purchaseUnit?: string;
+    technicalSheetUrl?: string;
+    realManufacturer?: string;
+    commercialStatus?: string;
+    defaultCurrency?: string;
+    warranty?: string;
+    leadTimeDays?: number;
+    stockReference?: string;
+    origin?: string;
+    internalNotes?: string;
+    primarySupplierId?: string;
+    technicalType?: string;
+    powerW?: number;
+    maxCurrentA?: number;
+    efficiencyPercent?: number;
+    panelSpecs?: CreateProductPanelSpecsDto;
+    inverterSpecs?: CreateProductInverterSpecsDto;
+    batterySpecs?: CreateProductBatterySpecsDto;
+}

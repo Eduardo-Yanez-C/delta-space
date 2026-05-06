@@ -1,0 +1,10 @@
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\hashlink-0150f84c4737edce.d: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\linked_hash_map.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\linked_hash_set.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\lru_cache.rs
+
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\libhashlink-0150f84c4737edce.rlib: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\linked_hash_map.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\linked_hash_set.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\lru_cache.rs
+
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\libhashlink-0150f84c4737edce.rmeta: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\linked_hash_map.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\linked_hash_set.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\lru_cache.rs
+
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\lib.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\linked_hash_map.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\linked_hash_set.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashlink-0.9.1\src\lru_cache.rs:

@@ -1,0 +1,13 @@
+node_modules
+
+# Builds / artefactos (evita rutas largas en Windows y subidas innecesarias)
+apps/desktop/dist/
+apps/api/dist/
+apps/web/.next/
+apps/web/out/
+*.tsbuildinfo
+
+# Entornos (nunca subir secretos)
+.env
+.env.*
+!.env.example

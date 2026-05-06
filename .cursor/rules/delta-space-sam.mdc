@@ -1,0 +1,11 @@
+---
+description: Marca DELTA SPACE y asistente SAM (producto)
+globs:
+alwaysApply: true
+---
+
+# DELTA SPACE y SAM
+
+- El producto / plataforma se llama **DELTA SPACE**. En textos de interfaz, documentación orientada al usuario y metadatos visibles, usar ese nombre.
+- El asistente de IA integrado en la aplicación (burbuja ✦, suite agent, `suite-agent`) se llama **SAM**. Cuando el usuario o el copy se refieran a “el asistente”, “la IA de la suite”, etc., en contexto de este software debe decirse **SAM**.
+- No renombrar rutas de carpetas del proyecto en el escritorio ni URLs de rutas (`/software-de-cotizaciones`, `/vista-previa-suite/agentes-ia`, etc.) salvo petición explícita: los cambios de marca son principalmente **texto visible** y **nombres de artefacto de producto**, no estructura de directorios del repo ni `appId` de Electron sin revisar impacto en licencias e instaladores.

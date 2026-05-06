@@ -1,0 +1,9 @@
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\quick_protobuf_codec-aa68df2a578ef353.d: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\generated\mod.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\generated\test.rs
+
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\libquick_protobuf_codec-aa68df2a578ef353.rlib: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\generated\mod.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\generated\test.rs
+
+C:\Users\eduar\OneDrive\Escritorio\Sofware de mejora\Sofware de Cotizaciones\apps\lan-p2p\target\release\deps\libquick_protobuf_codec-aa68df2a578ef353.rmeta: C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\lib.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\generated\mod.rs C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\generated\test.rs
+
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\lib.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\generated\mod.rs:
+C:\Users\eduar\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-codec-0.3.1\src\generated\test.rs:

@@ -1,0 +1,1809 @@
+// SQLite — SOLO empaquetado escritorio (Electron) y dev portable.
+// prepare-embedded-backend.js copia esta carpeta a embed-api/prisma/ cuando existe prisma/desktop/.
+// La API en desarrollo / producción nube usa prisma/schema.prisma (PostgreSQL).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// PV Quoting — Modelo consolidado: clientes, productos, proveedores, precios, cotizaciones.
+/// Estados y tipos enumerados lógicos se persisten como String; valores documentados en comentarios.
+
+// ========== USUARIOS Y ROLES ==========
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  name      String?
+  fullName  String?    // Nombre completo real (para header, documentos); distinto de rol
+  active    Boolean    @default(true)
+  /// JSON serializado: lista de claves de menú suite permitidas; null = sin restricción (comportamiento anterior).
+  suiteNavGrants String?
+  /// Tope de tokens OpenAI (total_tokens) por mes calendario UTC para el asistente de suite; null = sin límite.
+  suiteAgentMonthlyTokenLimit Int?
+
+  roles         UserRole[]
+  quotes        Quote[]    @relation("UserQuotes")
+  quotesAsSalesperson Quote[] @relation("QuoteSalesperson")
+  createdVersions QuoteVersion[] @relation("UserCreatedVersions")
+  updatedPrices   ProductPrice[] @relation("PriceUpdatedBy")
+  fvCalculations  QuoteFvCalculation[]
+  fvStudies       FvStudy[]
+  marginTemplateSnapshots MarginTemplateSnapshot[]
+  ownedRisks      Risk[]    @relation("RiskOwner")
+  assignedTasks   Task[]    @relation("TaskAssignee")
+  decisionsAsResponsible ProjectDecision[] @relation("DecisionResponsible")
+
+  createdConversations Conversation[]       @relation("ConversationCreatedBy")
+  conversationMembers  ConversationMember[]
+  messages             Message[]
+  sharedEntityDecisions SharedEntityImportDecision[]
+  messageReactions     MessageReaction[]
+  p2pIdentities        UserP2pIdentity[]
+
+  suiteAgentUsages SuiteAgentUsageLog[]
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+/// Consumo del asistente IA de suite (POST /suite-agent/chat); un registro por respuesta del modelo.
+model SuiteAgentUsageLog {
+  id               String   @id @default(cuid())
+  userId           String
+  createdAt        DateTime @default(now())
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  model            String   @default("")
+  roundIndex       Int      @default(1)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ========== PROYECTOS Y RIESGOS (Suite: vista previa) ==========
+
+model Project {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  name        String
+  client      String    @default("—")
+  status      String    @default("ACTIVE")
+  location    String?
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  progress    Float     @default(0)
+  description String?
+  /// Flujo de estados de tareas (JSON serializado en texto; SQLite).
+  taskStatusConfig String?
+  /// Estados de transporte terrestre (misma forma que taskStatusConfig): ids en inventario `logisticsTransportStatus`.
+  logisticsTransportStatusConfig String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  risks             Risk[]
+  tasks             Task[]
+  taskDependencies  TaskDependency[]
+  milestones        Milestone[]
+  commercialLinks   ProjectCommercialLink[]
+  decisions         ProjectDecision[]
+  documents         ProjectDocument[]
+  commitments       ProjectCommitment[]
+  resources         ProjectResource[]
+  inventoryItems    InventoryItem[]
+  logisticsSnapshots LogisticsInternationalSnapshot[]
+  locations         ProjectLocation[]
+  transportCommercialTariffs TransportCommercialTariff[]
+  transportGroupCommercials  TransportGroupCommercial[]
+  transportContracts           TransportContract[]
+  transportTripsCommercial     TransportTripCommercial[]
+  /// Perfil de variables de mercado (Fase 2 transporte); opcional.
+  transportVariableProfileId   String?
+  transportVariableProfile     TransportVariableProfile? @relation(fields: [transportVariableProfileId], references: [id], onDelete: SetNull)
+}
+
+/// Ubicaciones del proyecto (obra principal, bodegas, faena, etc.).
+model ProjectLocation {
+  id        String   @id @default(cuid())
+  projectId String
+  kind      String   @default("SITE") // SITE | WAREHOUSE | TRANSIT | YARD | OTHER
+  label     String
+  address   String?
+  latitude  Float?
+  longitude Float?
+  notes     String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([projectId, isPrimary])
+}
+
+/// Importación del libro «Logística internacional.xlsx»: paneles, pallets, embarques, transporte y resumen.
+model LogisticsInternationalSnapshot {
+  id               String   @id @default(cuid())
+  projectId        String?
+  title            String
+  orderRef         String?
+  sourceFileName   String?
+  /// JSON: { headline, productLine, panelCount, palletCount, routeText, … }
+  summaryJson      String
+  palletsJson      String
+  panelsJson       String
+  shipmentsJson    String
+  transportJson    String
+
+  project        Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  inventoryItems InventoryItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([orderRef])
+}
+
+/// Ítems de inventario / logística suite: stock con destino analítico (proyecto, ventas, cotización, catálogo).
+model InventoryItem {
+  id              String  @id @default(cuid())
+  sku             String?
+  name            String
+  description     String?
+  quantity        Float   @default(0)
+  unit            String  @default("unidad")
+  storageLocation String?
+  /// Destino: GENERAL | SALES_LOCAL | PROJECT | QUOTE | OTHER (ver código / DTO).
+  destinationKind String  @default("GENERAL")
+  destinationNote String?
+  projectId       String?
+  quoteId         String?
+  productId       String?
+  /// JSON opcional: vínculos extensibles ({ "fvStudyId": "...", "installationId": "..." }).
+  linksJson       String?
+  /// Importación «Operación internacional» vinculada (listado por proyecto incluye este vínculo).
+  logisticsInternationalSnapshotId String?
+  logisticsInternationalSnapshot   LogisticsInternationalSnapshot? @relation(fields: [logisticsInternationalSnapshotId], references: [id], onDelete: SetNull)
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  quote   Quote?   @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([quoteId])
+  @@index([productId])
+  @@index([destinationKind])
+  @@index([logisticsInternationalSnapshotId])
+}
+
+/// Tarea de cronograma / WBS (suite vista previa; alineado a Software de Mejora).
+model Task {
+  id                   String    @id @default(cuid())
+  projectId            String
+  wbsCode              String?
+  sortOrder            Int       @default(0)
+  isMilestone          Boolean   @default(false)
+  name                 String
+  startDate            DateTime
+  endDate              DateTime
+  duration             Int?
+  progress             Float     @default(0)
+  status               String    @default("TODO")
+  assignedTo           String?
+  assigneeUserId       String?
+  parentTaskId         String?
+  dependencyTaskId     String?
+  description          String?
+  contextNote          String?
+  /// Campos personalizados (texto JSON): array de { id, type, label, value, required } — SQLite usa String, no Json.
+  customFields         String?
+  /// Actividad de la ficha (texto JSON): [{ id, t, actor, message, kind }] — más reciente primero.
+  activityLog          String?
+  priority             String    @default("NORMAL")
+  taskKind             String    @default("STANDARD")
+  weight               Float     @default(1)
+  isCritical           Boolean   @default(false)
+  baselineStartDate    DateTime?
+  baselineEndDate      DateTime?
+  baselineDurationDays Int?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assigneeUser User? @relation("TaskAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+  parent     Task?   @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  children   Task[]  @relation("TaskHierarchy")
+  dependsOn  Task?   @relation("TaskDependency", fields: [dependencyTaskId], references: [id], onDelete: SetNull)
+  dependents Task[]  @relation("TaskDependency")
+  depsAsPredecessor TaskDependency[] @relation("TaskDependencyPredecessor")
+  depsAsSuccessor   TaskDependency[] @relation("TaskDependencySuccessor")
+
+  @@index([projectId])
+  @@index([parentTaskId])
+  @@index([dependencyTaskId])
+  @@index([projectId, sortOrder])
+  @@index([assigneeUserId])
+}
+
+model TaskDependency {
+  id                String   @id @default(cuid())
+  projectId         String
+  predecessorTaskId String
+  successorTaskId   String
+  createdAt         DateTime @default(now())
+
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  predecessor Task    @relation("TaskDependencyPredecessor", fields: [predecessorTaskId], references: [id], onDelete: Cascade)
+  successor   Task    @relation("TaskDependencySuccessor", fields: [successorTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([predecessorTaskId, successorTaskId])
+  @@index([projectId])
+  @@index([successorTaskId])
+  @@index([predecessorTaskId])
+}
+
+model Milestone {
+  id          String    @id @default(cuid())
+  projectId  String
+  name         String
+  description  String?
+  plannedDate  DateTime
+  actualDate   DateTime?
+  status       String    @default("PLANNED")
+  criticality  String    @default("NORMAL")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project      Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  commitments  ProjectCommitment[]
+
+  @@index([projectId])
+  @@index([projectId, plannedDate])
+}
+
+model ProjectCommercialLink {
+  id             String   @id @default(cuid())
+  projectId      String
+  externalSystem String
+  externalRef    String
+  metadata       String?
+  createdAt      DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ProjectDecision {
+  id                  String    @id @default(cuid())
+  projectId           String
+  title               String
+  description         String?
+  decisionDate        DateTime
+  responsible         String?
+  responsibleUserId   String?
+  impact              String    @default("MEDIUM")
+  category            String    @default("OTHER")
+  status              String    @default("APPROVED")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  responsibleUser User?   @relation("DecisionResponsible", fields: [responsibleUserId], references: [id], onDelete: SetNull)
+  commitments     ProjectCommitment[]
+
+  @@index([projectId])
+  @@index([responsibleUserId])
+}
+
+model ProjectDocument {
+  id         String   @id @default(cuid())
+  projectId  String
+  name       String
+  fileUrl    String
+  version    String   @default("1.0")
+  uploadedAt DateTime @default(now())
+  uploadedBy String?
+  type       String?
+  notes      String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ProjectResource {
+  id                String   @id @default(cuid())
+  name              String
+  type              String
+  status            String   @default("AVAILABLE")
+  assignedProjectId String?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  assignedProject Project? @relation(fields: [assignedProjectId], references: [id], onDelete: SetNull)
+
+  @@index([assignedProjectId])
+  @@index([type])
+}
+
+model ProjectCommitment {
+  id           String   @id @default(cuid())
+  projectId    String
+  title        String
+  description  String?
+  dueDate      DateTime
+  status       String   @default("OPEN")
+  owner        String?
+  sourceType   String   @default("MEETING")
+  decisionId   String?
+  milestoneId  String?
+  riskId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  decision  ProjectDecision? @relation(fields: [decisionId], references: [id], onDelete: SetNull)
+  milestone Milestone?       @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  risk      Risk?            @relation(fields: [riskId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([projectId, dueDate])
+  @@index([projectId, status])
+}
+
+model Risk {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  description String
+  severity    String
+  probability String
+  mitigation  String?
+  status      String   @default("OPEN")
+
+  owner       String?
+  ownerUserId String?
+  ownerUser   User?    @relation("RiskOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  dueDate     DateTime?
+  /// JSON serializado (SQLite de este proyecto no soporta Json nativo en Prisma).
+  mrbMatrix   String?
+  riskCategory String  @default("OPERATIONAL")
+  matrixKind   String  @default("MRB")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([riskCategory])
+  @@index([matrixKind])
+  @@index([ownerUserId])
+
+  commitments ProjectCommitment[]
+}
+
+// ========== CONVERSACIONES (V1-A: interno, texto, DM único por par) ==========
+// type: DIRECT | GROUP
+
+model Conversation {
+  id          String   @id @default(cuid())
+  type        String // DIRECT | GROUP
+  title       String?
+  createdById String
+  createdBy   User     @relation("ConversationCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  members  ConversationMember[]
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ConversationMember {
+  id             String    @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt       DateTime  @default(now())
+  leftAt         DateTime?
+  lastReadAt     DateTime?
+  /// Oculta la conversación en el listado del usuario sin borrar mensajes (archivo suave por miembro).
+  archivedAt     DateTime?
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body           String
+  kind           String   @default("TEXT") // TEXT | SHARED_ENTITY
+  /// JSON: { mentions: string[], quoteRefs: [{ quoteId, titleSnapshot, commercialNumberSnapshot }] }
+  metadataJson   String?
+  sharedEntity   MessageSharedEntity?
+  importDecisions SharedEntityImportDecision[]
+  reactions      MessageReaction[]
+  attachments    MessageAttachment[]
+  p2pDeliveries  P2pMessageDelivery[]
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+/// Identidad libp2p por usuario e instalación (mismo usuario puede tener varias máquinas).
+model UserP2pIdentity {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installationId String
+  peerId           String
+  displayName      String?
+  lastSeenAt       DateTime @default(now())
+
+  @@unique([userId, installationId])
+  @@index([peerId])
+  @@index([userId])
+}
+
+/// Estado de entrega P2P por mensaje y destinatario (grupos: N filas).
+model P2pMessageDelivery {
+  id           String   @id @default(cuid())
+  messageId    String
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  targetUserId String
+  targetPeerId String
+  state        String   @default("QUEUED") // QUEUED|SENT|DELIVERED|STORED|FAILED
+  lastError    String?
+  attempts     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([messageId, targetUserId])
+  @@index([messageId])
+}
+
+/// Transferencia de archivos P2P (metadatos + estado; bytes en disco vía daemon).
+model P2pFileTransfer {
+  id              String   @id @default(cuid())
+  transferId      String   @unique
+  conversationId  String
+  direction       String // OUTBOUND|INBOUND
+  peerId          String
+  state           String   @default("OFFERED") // OFFERED|ACCEPTED|REJECTED|TRANSFERRING|COMPLETE|FAILED
+  fileName        String
+  mimeType        String
+  sizeBytes       Int
+  sha256Hex       String
+  chunkSize       Int
+  totalChunks     Int
+  localPath       String? // relativo a uploads o p2p_data
+  receivedBytes   Int      @default(0)
+  messageId       String? // mensaje FILE asociado si existe
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([conversationId])
+  @@index([peerId])
+}
+
+model MessageAttachment {
+  id               String   @id @default(cuid())
+  messageId        String
+  message          Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  originalFileName String
+  mimeType         String
+  sizeBytes        Int
+  storagePath      String   // relativa a uploads/chat-attachments
+  createdAt        DateTime @default(now())
+
+  @@index([messageId])
+}
+
+model MessageReaction {
+  id         String   @id @default(cuid())
+  messageId  String
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji      String
+  createdAt  DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+}
+
+model MessageSharedEntity {
+  id                String   @id @default(cuid())
+  messageId         String   @unique
+  message           Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  entityType        String   // PRODUCT | SUPPLIER | CLIENT | FV_STUDY
+  snapshotJson      String   // resumen para tarjeta del chat (visible siempre)
+  proposedImportJson String  // payload candidato para crear/vincular en receptor
+  sourceEntityId    String?
+  sourceUserId      String
+  sourceUserName    String
+  sourceNodeName    String
+  createdAt         DateTime @default(now())
+}
+
+model SharedEntityImportDecision {
+  id                 String   @id @default(cuid())
+  messageId          String
+  message            Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  receiverUserId     String
+  receiverUser       User     @relation(fields: [receiverUserId], references: [id], onDelete: Cascade)
+  status             String   @default("PENDING") // PENDING | INTEGRATED | REJECTED | ERROR
+  resolutionMode     String?  // CREATE_NEW | USE_EXISTING | LINK_EXISTING | REJECT
+  targetEntityId     String?
+  errorMessage       String?
+  resolvedAt         DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([messageId, receiverUserId])
+  @@index([receiverUserId, status])
+}
+
+model Role {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  description String?
+
+  users       UserRole[]
+}
+
+model UserRole {
+  userId String
+  roleId Int
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+// ========== CLIENTES ==========
+
+model Client {
+  id        String      @id @default(cuid())
+  type      String
+  name      String
+  taxId     String?
+  email     String?
+  phone     String?
+  address   String?
+  notes     String?
+
+  quotes     Quote[]
+  fvStudies  FvStudy[]
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+// ========== ESTUDIOS FV ==========
+// Estudio FV independiente por cliente. Flujo: Cliente → Estudio FV → Cotización.
+// status: DRAFT | VALIDADO | COTIZADO | ARCHIVADO
+// connectionType: MONOFASICO | TRIFASICO (campo funcional futuro)
+// tipoProyecto: RESIDENCIAL | COMERCIAL | INDUSTRIAL
+
+model FvStudy {
+  id                    String   @id @default(cuid())
+
+  clientId              String
+  client                Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  ownerId               String?
+  owner                 User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  status                String   @default("DRAFT")
+  title                 String
+
+  referenceMonth        Int      // 1-12 (enero = 1, diciembre = 12)
+  referenceBillAmount   Float?
+  referenceConsumptionKwh Float?
+
+  valorKwhConsumo       Float
+  valorKwhInyeccion     Float
+  currency              String   @default("CLP")
+
+  connectionType        String   // MONOFASICO | TRIFASICO
+  tipoProyecto          String   // RESIDENCIAL | COMERCIAL | INDUSTRIAL
+  // systemType: ON_GRID | HYBRID | OFF_GRID (validaciones técnicas V1)
+  systemType            String?  @default("ON_GRID")
+  // Red de distribución disponible (respaldo / conexión a red). systemScenario se deriva, no se persiste.
+  utilityGridAvailable  Boolean  @default(true)
+  // Inyección / exportación a red permitida (solo coherente si hay red).
+  gridExportEnabled     Boolean  @default(true)
+
+  potenciaSistemaKwp    Float
+  potenciaPorPanelWp    Float
+  coberturaDeseada      Float
+  hspDailyUsed          Float
+  performanceRatioUsed  Float
+  calculationMethodVersion String
+
+  cantidadPaneles       Int
+  generacionAnualKwh    Float
+  ahorroAnual           Float
+  porcentajeAhorro      Float
+  pagoResidualAnual     Float
+
+  // --- Recurso solar (Fase 0: preparación para Explorador Solar) ---
+  // generationSource: INTERNAL | EXPLORADOR_SOLAR | MANUAL | EXTERNAL. En Fase 0 solo INTERNAL.
+  generationSource              String   @default("INTERNAL")
+  solarResourceProvider         String?
+  latitude                      Float?
+  longitude                     Float?
+  // mountingType: TECHO | SUELO | INCLINADO_FIJO | SEGUIMIENTO | OTRO
+  mountingType                  String?
+  tiltDegrees                   Float?
+  azimuthDegrees                Float?
+  solarResourceRequestedAt     DateTime?
+  // Temporal: string; más adelante migrar a JSON estructurado si el motor lo permite.
+  solarResourceMetadata         String?
+
+  months                FvStudyMonth[]
+  quotesSource          Quote[]  @relation("QuoteSourceFvStudy")
+  implantationDesign    ImplantationDesign?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// Diseño de implantación: 1 por estudio. Mapa, polígono techo, panel elegido, colocaciones.
+model ImplantationDesign {
+  id                     String   @id @default(cuid())
+  fvStudyId              String   @unique
+  fvStudy                FvStudy  @relation(fields: [fvStudyId], references: [id], onDelete: Cascade)
+
+  centerLat              Float
+  centerLng              Float
+  zoom                   Int
+  roofPolygonGeoJson     String?
+  panelProductId         String?
+  panel                  Product? @relation(fields: [panelProductId], references: [id], onDelete: SetNull)
+  panelNameSnapshot      String?
+  panelPowerWSnapshot    Int?
+  panelWidthMmSnapshot   Int?
+  panelLengthMmSnapshot  Int?
+  panelOrientationMode   String?  // VERTICAL | HORIZONTAL
+  spacingHorizontalMm    Int?
+  spacingVerticalMm      Int?
+  screenshotUrl          String?
+
+  placements             ImplantationPanelPlacement[]
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+// Cada panel colocado en el mapa (posición + orientación). stringId agrupa en strings.
+model ImplantationPanelPlacement {
+  id                    String   @id @default(cuid())
+  implantationDesignId  String
+  implantationDesign    ImplantationDesign @relation(fields: [implantationDesignId], references: [id], onDelete: Cascade)
+
+  positionIndex         Int
+  originLat             Float
+  originLng             Float
+  orientationDeg        Float?
+  stringId              String?  // "1", "2", … para resumen por string
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// Tabla mensual del estudio: exactamente 12 registros por FvStudy (monthIndex 1 a 12).
+// Unicidad: un estudio tiene como máximo un registro por mes.
+
+model FvStudyMonth {
+  id                String   @id @default(cuid())
+
+  fvStudyId         String
+  fvStudy           FvStudy  @relation(fields: [fvStudyId], references: [id], onDelete: Cascade)
+
+  monthIndex        Int      // 1 = enero, 12 = diciembre
+  consumptionKwh    Float
+  consumptionValue  Float?
+  generationKwh     Float
+  generationValue   Float?
+  savingsPercent    Float?
+  estimatedPayment  Float?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([fvStudyId, monthIndex])
+}
+
+// ========== PROVEEDORES ==========
+// supplyOrigin: NACIONAL | INTERNACIONAL
+// actorType: FABRICANTE | DISTRIBUIDOR | REPRESENTANTE | IMPORTADOR | INTEGRADOR | TRANSPORTISTA
+
+model Supplier {
+  id              String   @id @default(cuid())
+  name            String
+  legalName       String?
+  taxId           String?
+  giro            String?
+  commercialAddress String?
+  contactName     String?
+  email           String?
+  phone           String?
+  country         String?
+  city            String?
+  defaultCurrency String?
+  supplyOrigin    String
+  actorType       String
+  paymentTerms    String?
+  leadTimeDays    Int?
+  notes           String?
+  active          Boolean  @default(true)
+
+  productSuppliers ProductSupplier[]
+  prices           ProductPrice[]
+  primaryProducts  Product[]       @relation("ProductPrimarySupplier")
+  transportCommercialTariffs TransportCommercialTariff[]
+  transportContracts           TransportContract[]
+  transportTripsCommercial     TransportTripCommercial[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Contrato comercial de transporte (transportista ↔ proyecto opcional). Versionado con tarifario estructurado.
+model TransportContract {
+  id                  String    @id @default(cuid())
+  supplierId          String
+  projectId           String?
+  title               String
+  contractNumber      String?
+  clientLegalName     String?
+  contractorLegalName String?
+  signedAt            DateTime?
+  paymentTerms        String?
+  jurisdiction        String?
+  defaultCurrency     String    @default("CLP")
+  defaultVatPercent   Float     @default(19)
+  notes               String?
+  active              Boolean   @default(true)
+  /// Perfil de variables (Inputs); resolución: contrato → proyecto → solo global.
+  transportVariableProfileId String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  transportVariableProfile TransportVariableProfile? @relation(fields: [transportVariableProfileId], references: [id], onDelete: SetNull)
+  versions TransportContractVersion[]
+
+  @@index([supplierId])
+  @@index([projectId])
+  @@index([active])
+  @@index([transportVariableProfileId])
+}
+
+/// Catálogo de variables de mercado / operación (Fase 2 — hoja «Inputs» del Excel).
+model TransportVariable {
+  id          String   @id @default(cuid())
+  /// Clave estable única, p.ej. DIESEL_SANTIAGO.
+  key         String   @unique
+  label       String
+  description String?
+  /// Unidad por defecto (texto libre: CLP/L, L/km, %…).
+  defaultUnit String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  values TransportVariableValue[]
+
+  @@index([active])
+}
+
+/// Perfil nombrado de variables (ej. Coyhaique Q2 2026).
+model TransportVariableProfile {
+  id        String   @id @default(cuid())
+  name      String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  values    TransportVariableValue[]
+  contracts TransportContract[]
+  projects  Project[]
+  trips     TransportTripCommercial[]
+}
+
+/// Historial de valores con vigencia. profileId null = ámbito global.
+model TransportVariableValue {
+  id         String    @id @default(cuid())
+  variableId String
+  profileId  String?
+  value      Float
+  unit       String?
+  validFrom  DateTime
+  validTo    DateTime?
+  /// MANUAL | API | IMPORT
+  source     String    @default("MANUAL")
+  note       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  variable TransportVariable        @relation(fields: [variableId], references: [id], onDelete: Cascade)
+  profile  TransportVariableProfile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([variableId, validFrom])
+  @@index([profileId])
+}
+
+/// Versión publicable del contrato (borrador → publicada). Tarifario en ítems hijos.
+model TransportContractVersion {
+  id            String    @id @default(cuid())
+  contractId  String
+  versionNumber Int
+  /// DRAFT | PUBLISHED | ARCHIVED
+  status        String    @default("DRAFT")
+  label         String?
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  publishedAt   DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  contract TransportContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  items     TransportTariffItem[]
+  overrides TransportTariffOverride[]
+  deals     TransportGroupCommercial[]
+  trips     TransportTripCommercial[]
+
+  @@unique([contractId, versionNumber])
+  @@index([contractId, status])
+}
+
+/// Línea de tarifario contractual (anexo por versión).
+model TransportTariffItem {
+  id                String   @id @default(cuid())
+  contractVersionId String
+  /// Código estable p. ej. FLETE_BASE (opcional).
+  code              String?
+  label             String
+  /// TRIP | CONTAINER | DAY | HOUR | KM | LITER | FIXED | UF_PER_TON_MONTH | PCT | OTHER
+  unit              String   @default("OTHER")
+  amount            Float    @default(0)
+  currency          String   @default("CLP")
+  /// NONE | VAT_EXTRA | VAT_INCLUDED
+  taxMode           String   @default("VAT_EXTRA")
+  legalRef          String?
+  sortOrder         Int      @default(0)
+  notes             String?
+  /// Vigencia de la línea (Fase 1); null = sin restricción explícita en ítem.
+  activeFrom        DateTime?
+  activeTo          DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  contractVersion TransportContractVersion @relation(fields: [contractVersionId], references: [id], onDelete: Cascade)
+  overridesAsBase TransportTariffOverride[] @relation("TariffOverrideBase")
+
+  @@index([contractVersionId, sortOrder])
+}
+
+/// Excepción / rider sobre el tarifario (Fase 1): motivo, documento, vigencia; sustituye, suprime o agrega.
+model TransportTariffOverride {
+  id                  String    @id @default(cuid())
+  contractVersionId   String
+  /// Línea base afectada (null = cargo adicional sin vínculo a una línea).
+  baseTariffItemId    String?
+  /// ADDITION | REPLACE_BASE | SUPPRESS_BASE
+  action              String    @default("ADDITION")
+  label               String
+  amount              Float     @default(0)
+  currency            String    @default("CLP")
+  unit                String    @default("OTHER")
+  taxMode             String    @default("VAT_EXTRA")
+  legalRef            String?
+  reason              String
+  documentRef         String?
+  validFrom           DateTime
+  validTo             DateTime?
+  sortOrder           Int       @default(0)
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  contractVersion TransportContractVersion @relation(fields: [contractVersionId], references: [id], onDelete: Cascade)
+  baseItem          TransportTariffItem?   @relation("TariffOverrideBase", fields: [baseTariffItemId], references: [id], onDelete: SetNull)
+
+  @@index([contractVersionId, sortOrder])
+  @@index([baseTariffItemId])
+}
+
+/// Plantilla de precio comercial de transporte (por proyecto y/o transportista). Referencia para acuerdos por viaje/grupo.
+model TransportCommercialTariff {
+  id                    String   @id @default(cuid())
+  projectId             String?
+  supplierId            String?
+  label                 String
+  originHint            String?
+  destinationHint       String?
+  baseAmount            Float
+  currency              String   @default("CLP")
+  /// % de ajuste sugerido (ej. combustible) sobre baseAmount.
+  fuelAdjustmentPercent Float?
+  notes                 String?
+  active                Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  project  Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  deals    TransportGroupCommercial[]
+
+  @@index([projectId])
+  @@index([supplierId])
+  @@index([active])
+}
+
+/// Acuerdo comercial por grupo de inventario (misma clave que transporte: proyecto|pallet).
+model TransportGroupCommercial {
+  id                   String   @id @default(cuid())
+  /// `${projectId}|${palletId ?? '_sin_pallet'}`
+  groupKey             String   @unique
+  projectId            String
+  palletId             String?
+  tariffId             String?
+  contractVersionId    String?
+  /// Copia del baseAmount de la plantilla al vincular (auditoría).
+  templateBaseSnapshot Float?
+  fuelSurchargePercent Float?
+  agreedAmount         Float?
+  currency             String   @default("CLP")
+  manualPrice          Boolean  @default(false)
+  commercialNotes      String?
+  /// DRAFT | SUBMITTED | AGREED
+  commercialStatus     String   @default("DRAFT")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  project           Project?                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tariff            TransportCommercialTariff? @relation(fields: [tariffId], references: [id], onDelete: SetNull)
+  contractVersion   TransportContractVersion? @relation(fields: [contractVersionId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([tariffId])
+  @@index([contractVersionId])
+}
+
+/// Viaje comercial (ledger Fase 3): desglose y totales; cerrado = inmutable.
+model TransportTripCommercial {
+  id                    String    @id @default(cuid())
+  projectId             String
+  /// Misma clave que acuerdo operativo / inventario.
+  groupKey              String
+  palletId              String?
+  tripNumber            String
+  supplierId            String?
+  tripDate              DateTime  @default(now())
+  /// COMMERCIAL | SUBSIDIZED | OTHER
+  scenario              String    @default("COMMERCIAL")
+  kmUsed                Float?
+  litersUsed            Float?
+  extraChargesNote      String?
+  /// DRAFT | CLOSED
+  status                String    @default("DRAFT")
+  currency              String    @default("CLP")
+  subtotal              Float?
+  vatAmount             Float?
+  total                 Float?
+  /// Referencias congeladas al cerrar (en borrador se actualizan al recalcular).
+  contractVersionId     String?
+  variableProfileId     String?
+  notes                 String?
+  closedAt              DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  supplier          Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  contractVersion   TransportContractVersion? @relation(fields: [contractVersionId], references: [id], onDelete: SetNull)
+  variableProfile     TransportVariableProfile? @relation(fields: [variableProfileId], references: [id], onDelete: SetNull)
+  lines               TransportTripCostLine[]
+
+  @@index([projectId, tripDate])
+  @@index([groupKey])
+  @@index([status])
+  @@unique([groupKey, tripNumber])
+}
+
+/// Línea de desglose del viaje comercial.
+model TransportTripCostLine {
+  id         String   @id @default(cuid())
+  tripId     String
+  sortOrder  Int      @default(0)
+  concept    String
+  amount     Float
+  currency   String   @default("CLP")
+  /// TARIFF_ITEM | TARIFF_OVERRIDE_ADD | TARIFF_OVERRIDE_REPLACE | TARIFF_OVERRIDE_SUPPRESS | FUEL_SURCHARGE | TEMPLATE_BASE | MANUAL
+  sourceKind String
+  sourceRef  String?
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  trip TransportTripCommercial @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId, sortOrder])
+}
+
+// ========== CATÁLOGO: CATEGORÍAS, MARCAS, MODELOS ==========
+// Categoría: tipo de producto (paneles, inversores, baterías, etc.). Independiente de proveedor.
+
+model ProductCategory {
+  id        Int               @id @default(autoincrement())
+  name      String
+  slug      String            @unique
+
+  parentId  Int?
+  parent    ProductCategory?  @relation("CategoryToParent", fields: [parentId], references: [id])
+  children  ProductCategory[] @relation("CategoryToParent")
+
+  products       Product[]
+  quoteItems     QuoteItem[]      @relation("CategoryQuoteItems")
+  quoteItemLines QuoteItemLine[]  @relation("LineCategory")
+}
+
+model Brand {
+  // Marca: catálogo maestro. Independiente del proveedor. Un proveedor puede vender varias marcas.
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+
+  products       Product[]
+  models         ProductModel[]
+  quoteItems     QuoteItem[]     @relation("BrandQuoteItems")
+  quoteItemLines QuoteItemLine[] @relation("LineBrand")
+}
+
+model ProductModel {
+  // Modelo: pertenece a una Brand. Identificador técnico/comercial (ej. X1-Smart, 600-620W).
+  id       Int     @id @default(autoincrement())
+  name     String
+
+  brandId  Int
+  brand    Brand   @relation(fields: [brandId], references: [id])
+
+  products       Product[]
+  quoteItems     QuoteItem[]     @relation("ModelQuoteItems")
+  quoteItemLines QuoteItemLine[] @relation("LineModel")
+
+  @@unique([brandId, name])
+}
+
+// ========== PRODUCTOS ==========
+// Producto: entidad central del catálogo. Oferta técnica/comercial (marca + modelo + categoría + especificaciones).
+// primarySupplierId = proveedor por defecto para compra; el mismo producto puede estar en varios proveedores (ProductSupplier).
+// commercialStatus: ACTIVO | DESCONTINUADO | BAJO_REVISION. unit = unidad de venta; purchaseUnit = unidad de compra si difiere.
+
+model Product {
+  id                String    @id @default(cuid())
+  name              String
+  description       String?
+  internalCode      String?
+  sku               String?
+  technicalSheetUrl String?
+  realManufacturer  String?
+  commercialStatus  String    @default("ACTIVO")
+  defaultCurrency   String?
+  unit              String
+  purchaseUnit      String?
+  warranty          String?
+  leadTimeDays      Int?
+  stockReference    String?
+  origin            String?
+  internalNotes     String?
+
+  // --- Especificaciones técnicas (validaciones de compatibilidad V1). Valores: connectionType MONOFASICO|TRIFASICO; inverterType ON_GRID|HYBRID|OFF_GRID ---
+  connectionType     String?   // MONOFASICO | TRIFASICO (inversores, protecciones AC)
+  nominalVoltageV    Int?      // Tensión nominal en V (inversores, baterías)
+  inverterType       String?   // ON_GRID | HYBRID | OFF_GRID (solo inversores)
+  isBatteryComponent Boolean?  // true si es batería o componente de almacenamiento
+
+  // --- Campos técnicos comunes (Fase 1 catálogo). Opcionales para compatibilidad. ---
+  technicalType     String?   // Ej. MONOCRISTALINO, BIFACIAL, ON_GRID, STRING, MICROINVERSOR
+  powerW            Int?      // Potencia en W (paneles, inversores)
+  maxCurrentA      Float?    // Corriente máxima en A (inversores, protecciones)
+  efficiencyPercent Float?   // Eficiencia % (paneles, inversores)
+
+  categoryId        Int
+  category          ProductCategory @relation(fields: [categoryId], references: [id])
+
+  brandId           Int?
+  brand             Brand?            @relation(fields: [brandId], references: [id])
+  brandNameFree     String?           // Marca escrita a mano cuando no se elige del catálogo
+  modelId           Int?
+  model             ProductModel?     @relation(fields: [modelId], references: [id])
+  modelNameFree     String?           // Modelo escrito a mano cuando no se elige del catálogo
+
+  primarySupplierId String?
+  primarySupplier   Supplier?         @relation("ProductPrimarySupplier", fields: [primarySupplierId], references: [id])
+
+  productSuppliers    ProductSupplier[]
+  prices              ProductPrice[]
+  quoteItems          QuoteItem[]
+  quoteItemLines      QuoteItemLine[]   @relation("LineProduct")
+  quoteTemplateLines  QuoteTemplateLine[]
+  panelSpecs         ProductPanelSpecs?
+  inverterSpecs      ProductInverterSpecs?
+  batterySpecs       ProductBatterySpecs?
+  implantationDesignsWherePanel ImplantationDesign[]
+  inventoryItems     InventoryItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Especificaciones técnicas por categoría: paneles. 1:1 opcional (solo productos de categoría paneles). Fase 1 catálogo.
+model ProductPanelSpecs {
+  id                 String   @id @default(cuid())
+
+  productId          String   @unique
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  powerW             Int?
+  efficiencyPercent  Float?
+  vmpV               Float?   // Tensión en punto de máxima potencia
+  impA               Float?   // Corriente en punto de máxima potencia
+  vocV               Float?   // Tensión en circuito abierto
+  iscA               Float?   // Corriente en cortocircuito
+  bifacialityPercent Float?
+  cellType           String?  // Ej. MONOCRISTALINO, POLICRISTALINO
+  lengthMm           Int?
+  widthMm            Int?
+  heightMm           Int?
+  weightKg           Float?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// Especificaciones técnicas por categoría: inversores. 1:1 opcional. Fase 2 catálogo.
+model ProductInverterSpecs {
+  id                 String   @id @default(cuid())
+
+  productId          String   @unique
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  inverterType       String?  // ON_GRID | HYBRID | OFF_GRID
+  powerAcW           Int?
+  maxPvVoltageV     Float?
+  startupVoltageV   Float?
+  mpptVoltageMinV   Float?
+  mpptVoltageMaxV   Float?
+  maxDcCurrentA     Float?
+  efficiencyPercent Float?
+  connectionType    String?  // MONOFASICO | TRIFASICO
+  ipRating          String?
+  communication     String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// Especificaciones técnicas por categoría: baterías. 1:1 opcional. Fase 2 catálogo.
+model ProductBatterySpecs {
+  id                      String   @id @default(cuid())
+
+  productId               String   @unique
+  product                 Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  capacityKwh             Float?
+  nominalVoltageV         Float?
+  maxChargeDischargePowerW Float?
+  chemistry               String?
+  cycles                  Int?
+  weightKg                Float?
+  dimensionsMm            String?
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+// ========== RELACIÓN PRODUCTO–PROVEEDOR (N:M con atributos) ==========
+// Relación N:M: "este producto está disponible en este proveedor". Precio por combinación en ProductPrice.
+
+model ProductSupplier {
+  id           String   @id @default(cuid())
+  productId    String
+  supplierId   String
+  isPrimary    Boolean  @default(false)
+  isAlternative Boolean @default(false)
+  leadTimeDays Int?
+  moq          String?
+  warranty     String?
+  notes        String?
+
+  product  Product  @relation(fields: [productId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, supplierId])
+}
+
+// ========== HISTORIAL DE PRECIOS ==========
+// Por producto y opcionalmente por proveedor; trazabilidad y auditoría.
+
+model ProductPrice {
+  id                     String   @id @default(cuid())
+
+  productId              String
+  product                Product  @relation(fields: [productId], references: [id])
+
+  supplierId             String?
+  supplier               Supplier? @relation(fields: [supplierId], references: [id])
+
+  price                  Decimal
+  cost                   Decimal?
+  purchasePrice          Decimal?
+  currency               String   @default("CLP")
+  priceListType          String   @default("BASE")
+
+  validFrom              DateTime
+  validTo                DateTime?
+
+  lastQuoteReceivedAt   DateTime?
+  lastUpdatedAt         DateTime?
+  suggestedMarginPercent Decimal?
+  supplierDiscountPercent Decimal?
+  logisticCostEstimate   Decimal?
+  customsCostEstimate    Decimal?
+  totalLandedCost        Decimal?
+  moq                    String?
+  warranty               String?
+
+  quoteReference         String?
+  quoteReceivedAt        DateTime?
+  validityIndicator      String?
+  internalCommercialNotes String?
+
+  updatedById            String?
+  updatedBy              User?    @relation("PriceUpdatedBy", fields: [updatedById], references: [id])
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+// ========== COTIZACIONES ==========
+// Versiones y snapshot por ítem; moneda, vencimiento, condiciones, etapa comercial.
+
+model Quote {
+  id            String        @id @default(cuid())
+
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id])
+
+  ownerId       String
+  owner         User          @relation("UserQuotes", fields: [ownerId], references: [id])
+
+  sourceFvStudyId String?
+  sourceFvStudy   FvStudy?    @relation("QuoteSourceFvStudy", fields: [sourceFvStudyId], references: [id], onDelete: SetNull)
+  suggestedItemsFromStudy Boolean @default(false) // propuesta base desde estudio; usado en frontend para banner
+
+  sourceQuoteTemplateId String?
+  sourceQuoteTemplate   QuoteTemplate? @relation("QuoteSourceTemplate", fields: [sourceQuoteTemplateId], references: [id], onDelete: SetNull)
+
+  /// Estados comerciales: BORRADOR, LISTA_PARA_ENVIAR, ENVIADA, ACEPTADA, RECHAZADA, ANULADA (sinónimos CANCELADA/CANCELADO), CERRADA_SIN_VENTA, EXPIRADA, ARCHIVADA. GET /quotes omite ANULADA y ARCHIVADA salvo includeInactive=true.
+  status        String        @default("BORRADOR")
+  title         String
+  projectType   String
+
+  // Número correlativo comercial: secuencia global desde 2780, sufijo por tipo (RES/COM/IND)
+  commercialSequence Int?      @unique // 2780, 2781, 2782...
+  commercialNumber   String?   @unique // "2780-RES", "2781-COM"...
+
+  internalNotes String?
+  clientNotes   String?
+
+  currency        String?
+  validUntil      DateTime?
+  paymentTerms    String?
+  deliveryDays    Int?
+  commercialStage String?
+
+  // Trazabilidad CRM: número de lead y vendedor responsable
+  leadNumber      String?
+  salespersonId   String?
+  salesperson     User?        @relation("QuoteSalesperson", fields: [salespersonId], references: [id], onDelete: SetNull)
+
+  /// STANDARD | MARGIN — Etapa 1: solo persistencia; visibilidad MARGIN en E2.
+  quoteKind            String  @default("STANDARD")
+  /// Parámetros técnicos mínimos serializados como JSON (texto / JSON según convención app).
+  technicalBasicsJson  String?
+
+  versions        QuoteVersion[]
+  fvCalculations  QuoteFvCalculation[]
+  inventoryItems  InventoryItem[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+/// E2: jerarquía MARGIN valorizada reutilizable (no es QuoteTemplate).
+model MarginTemplateSnapshot {
+  id                   String   @id @default(cuid())
+  name                 String
+  description          String?
+  createdById          String
+  createdBy            User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  sourceQuoteId        String?
+  sourceQuoteVersionId String?
+
+  systemType           String?
+  mountStructureType   String?
+
+  schemaVersion        String   @default("1")
+  /// JSON: { schemaVersion, blocks } — serializado con JSON.stringify.
+  payloadJson          String
+
+  active               Boolean  @default(true)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model QuoteVersion {
+  id                     String      @id @default(cuid())
+
+  quoteId                String
+  quote                  Quote       @relation(fields: [quoteId], references: [id])
+
+  versionNumber          Int
+  status                 String
+
+  subtotal               Decimal
+  discountsTotal         Decimal
+  marginTotal            Decimal
+  taxesTotal             Decimal
+  total                  Decimal
+
+  globalDiscountPercent  Decimal?
+  globalMarginPercent    Decimal?
+  vatPercent             Decimal
+
+  createdById            String
+  createdBy              User        @relation("UserCreatedVersions", fields: [createdById], references: [id])
+
+  items            QuoteItem[]
+  mainItems        QuoteMainItem[]
+  fvCalculations   QuoteFvCalculation[]
+  addOnInputs      QuoteAddOnInput[]
+  addOnSuggestions QuoteAddOnSuggestion[]
+
+  fvSnapshot       String? // JSON: snapshot técnico FV al congelar versión (status !== BORRADOR)
+
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  @@unique([quoteId, versionNumber])
+}
+
+// ========== CÁLCULO FV POR COTIZACIÓN ==========
+// Entradas, supuestos usados y resultados; backend recalcula al guardar.
+// Prioridad consumo: si consumoAnualKwh existe se usa; si no, consumoMensualKwh * 12.
+// Generación mensual en Fase 5: generacionAnualKwh / 12.
+
+model QuoteFvCalculation {
+  id               String   @id @default(cuid())
+
+  quoteId          String
+  quote            Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  quoteVersionId   String?
+  quoteVersion     QuoteVersion? @relation(fields: [quoteVersionId], references: [id], onDelete: SetNull)
+
+  // Entradas
+  consumoMensualKwh    Float
+  consumoAnualKwh      Float?
+  cuentaMensual        Float
+  valorKwhConsumo      Float
+  valorKwhInyeccion    Float
+  coberturaDeseada     Float
+  tipoProyecto         String
+  potenciaObjetivoKwp  Float?
+  potenciaPorPanelWp   Float
+  currency             String   @default("USD")
+
+  // Supuestos usados (persistidos)
+  hspDailyUsed             Float
+  performanceRatioUsed     Float
+  calculationMethodVersion String
+
+  // Resultados
+  plantaKwp            Float
+  cantidadPaneles     Int
+  generacionAnualKwh  Float
+  generacionMensualKwh Float
+  ahorroMensual       Float
+  ahorroAnual         Float
+  porcentajeAhorro    Float
+  pagoResidual        Float
+
+  createdById   String?
+  createdBy     User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ========== ÍTEMS DE COTIZACIÓN (snapshot) ==========
+
+model QuoteItem {
+  id                      String          @id @default(cuid())
+
+  quoteVersionId          String
+  quoteVersion            QuoteVersion    @relation(fields: [quoteVersionId], references: [id])
+
+  productId               String?
+  product                 Product?        @relation(fields: [productId], references: [id])
+
+  categoryId              Int?
+  category                ProductCategory? @relation("CategoryQuoteItems", fields: [categoryId], references: [id])
+
+  brandId                 Int?
+  brand                   Brand?         @relation("BrandQuoteItems", fields: [brandId], references: [id])
+
+  modelId                 Int?
+  model                   ProductModel?  @relation("ModelQuoteItems", fields: [modelId], references: [id])
+
+  productNameSnapshot     String
+  productDescriptionSnapshot String?
+  categoryNameSnapshot    String?
+  brandNameSnapshot       String?
+  modelNameSnapshot       String?
+
+  currencySnapshot        String
+  unitPriceSnapshot       Decimal
+  unitCostSnapshot        Decimal?
+  discountPercentSnapshot Decimal?
+  marginPercentSnapshot   Decimal?
+
+  quantity                Decimal
+  lineTotalSnapshot       Decimal
+
+  configSnapshot          String?
+
+  sortOrder               Int?
+
+  addOnSuggestionSource   QuoteAddOnSuggestion?
+
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+}
+
+// ========== ÍTEMS PRINCIPALES Y LÍNEAS (jerárquico) ==========
+// Fase 1: convive con QuoteItem; backfill copia 1 MainItem + 1 Line por cada QuoteItem.
+
+model QuoteMainItem {
+  id                   String   @id @default(cuid())
+  quoteVersionId       String
+  quoteVersion         QuoteVersion @relation(fields: [quoteVersionId], references: [id], onDelete: Cascade)
+
+  name                 String
+  description          String?
+  sortOrder            Int      @default(0)
+  visibleInFinalQuote  Boolean  @default(true)
+  totalMode            String   // SUM_LINES | MANUAL
+  totalOverride        Decimal?
+  sourceFromFvStudyKind String?  // PANELS | INVERTER | STRUCTURE when created from FV study
+
+  lines                QuoteItemLine[]
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model QuoteItemLine {
+  id                       String   @id @default(cuid())
+  quoteMainItemId          String
+  quoteMainItem            QuoteMainItem @relation(fields: [quoteMainItemId], references: [id], onDelete: Cascade)
+
+  productId                String?
+  product                  Product? @relation("LineProduct", fields: [productId], references: [id])
+  categoryId               Int?
+  category                 ProductCategory? @relation("LineCategory", fields: [categoryId], references: [id])
+  brandId                  Int?
+  brand                    Brand? @relation("LineBrand", fields: [brandId], references: [id])
+  modelId                  Int?
+  model                    ProductModel? @relation("LineModel", fields: [modelId], references: [id])
+
+  productNameSnapshot      String
+  productDescriptionSnapshot String?
+  categoryNameSnapshot     String?
+  brandNameSnapshot        String?
+  modelNameSnapshot        String?
+
+  currencySnapshot         String
+  unitPriceSnapshot        Decimal
+  unitCostSnapshot         Decimal?
+  discountPercentSnapshot Decimal?
+  marginPercentSnapshot    Decimal?
+
+  quantity                 Decimal
+  lineTotalSnapshot        Decimal
+  configSnapshot           String?
+
+  sortOrder                Int      @default(0)
+  visibleInFinalQuote      Boolean  @default(false)
+
+  addOnSuggestionId       String?  @unique
+  addOnSuggestion         QuoteAddOnSuggestion?
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+// ========== PLANTILLAS DE COTIZACIÓN ==========
+// Fase 1: solo plantillas base (3/4/6 kW OnGrid). Ítems con cantidad fija o derivada de potencia (paneles).
+
+model QuoteTemplate {
+  id              String   @id @default(cuid())
+  name            String
+  /// STANDARD | MARGIN — alineado con Quote.quoteKind; default STANDARD para plantillas históricas.
+  quoteKind       String   @default("STANDARD")
+  systemType      String   // ON_GRID | OFF_GRID | HYBRID (plantillas estándar por tipo de sistema)
+  targetPowerKwp Decimal
+  description     String?
+  active          Boolean  @default(true)
+  sortOrder       Int      @default(0)
+
+  items     QuoteTemplateItem[]
+  quotes    Quote[]              @relation("QuoteSourceTemplate")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model QuoteTemplateItem {
+  id                        String        @id @default(cuid())
+  quoteTemplateId           String
+  quoteTemplate             QuoteTemplate @relation(fields: [quoteTemplateId], references: [id], onDelete: Cascade)
+
+  sortOrder                 Int
+  itemType                  String        // PANELES | INVERSOR | ESTRUCTURA | INSTALACION | CANALIZACION | INGENIERIA | BATERIAS | PROTECCIONES_TABLERO | OTRO
+  quantityRule              String        // FIXED | DERIVED_FROM_POWER
+  quantityFixed             Int?
+  potenciaPorPanelWp        Int?          // solo para PANELES con DERIVED_FROM_POWER
+  productNameSnapshot       String
+  productDescriptionSnapshot String?
+  unitPriceDefault          Decimal?     @default(0)
+  /// Al materializar cotización: visibilidad del bloque (QuoteMainItem) en PDF / cotización final.
+  visibleInFinalQuoteDefault Boolean     @default(true)
+
+  lines                     QuoteTemplateLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Líneas base por ítem de plantilla (plantillas completas T1). Si un ítem tiene 0 líneas, al generar cotización se usa una línea desde el ítem.
+model QuoteTemplateLine {
+  id                          String   @id @default(cuid())
+  quoteTemplateItemId         String
+  quoteTemplateItem            QuoteTemplateItem @relation(fields: [quoteTemplateItemId], references: [id], onDelete: Cascade)
+
+  sortOrder                   Int
+  source                      String   // MANUAL | FROM_CATALOG
+  productId                   String?
+  product                     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  productNameSnapshot         String?
+  productDescriptionSnapshot  String?
+  quantityRule                String   // FIXED | DERIVED_FROM_POWER
+  quantityFixed               Int?
+  potenciaPorPanelWp          Int?
+  unitPriceDefault            Decimal? @default(0)
+  currency                    String?
+  visibleInFinalQuoteDefault  Boolean  @default(false)
+
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}
+
+// ========== ADICIONALES AUTOMÁTICOS (Fase 2.1: base) ==========
+// Reglas maestras; code es identificador estable para seed y referencias futuras.
+
+model QuoteAddOn {
+  id               String   @id @default(cuid())
+  code             String   @unique
+  name             String
+  description      String?
+  active           Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  conditionType    String   // NUMERIC_GT, NUMERIC_GTE, NUMERIC_LT, NUMERIC_LTE, BOOLEAN
+  thresholdNumeric Decimal?
+  inputKey         String
+  quantityRule     String   // FIXED, EXCESS, VALUE
+  unit             String
+  unitPriceDefault Decimal? @default(0)
+  currency         String?
+  applicationMode  String   // AUTO | SUGERIDO; en 2.2 solo se evalúan reglas SUGERIDO
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  suggestions      QuoteAddOnSuggestion[]
+}
+
+// Inputs por versión; valueNumeric y valueText usados por el motor de evaluación (Fase 2.2).
+model QuoteAddOnInput {
+  id             String        @id @default(cuid())
+  quoteVersionId String
+  quoteVersion   QuoteVersion  @relation(fields: [quoteVersionId], references: [id], onDelete: Cascade)
+  inputKey       String
+  valueNumeric   Decimal?
+  valueText      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([quoteVersionId, inputKey])
+}
+
+// Sugerencias de adicionales por versión (resultado del motor). Al re-evaluar solo se borran PENDING.
+model QuoteAddOnSuggestion {
+  id                   String        @id @default(cuid())
+  quoteVersionId       String
+  quoteVersion         QuoteVersion  @relation(fields: [quoteVersionId], references: [id], onDelete: Cascade)
+  quoteAddOnId         String
+  quoteAddOn           QuoteAddOn    @relation(fields: [quoteAddOnId], references: [id], onDelete: Cascade)
+  suggestedQuantity    Decimal
+  suggestedUnitPrice   Decimal
+  currency             String?
+  status               String        // PENDING | ACCEPTED | REJECTED
+  quoteItemId          String?       @unique
+  quoteItem            QuoteItem?    @relation(fields: [quoteItemId], references: [id], onDelete: SetNull)
+  quoteItemLineId      String?       @unique
+  quoteItemLine        QuoteItemLine? @relation(fields: [quoteItemLineId], references: [id], onDelete: SetNull)
+  // evaluatedValueNumeric Decimal?  // Futuro: valor usado en la evaluación (auditoría); no usado en 2.2
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@unique([quoteVersionId, quoteAddOnId])
+}
+
+// ========== INSTALACIONES / ACTIVACIÓN ==========
+// Códigos de activación emitidos (ej. por administrador). Cada código permite hasta maxActivations instalaciones.
+
+model ActivationCode {
+  id              String   @id @default(cuid())
+  code            String   @unique  // Código que el usuario ingresa (ej. XXXX-XXXX-XXXX)
+  maxActivations  Int      @default(1)
+  createdAt       DateTime @default(now())
+
+  installations   Installation[]
+}
+
+/// Instalación registrada (equipo/cliente). Token emitido por backend; permite revocación futura.
+model Installation {
+  id                  String    @id @default(cuid())
+  activationCodeId    String
+  activationCode      ActivationCode @relation(fields: [activationCodeId], references: [id], onDelete: Cascade)
+  deviceName          String?
+  machineFingerprint  String?   // Identificador único del equipo (opcional, para control)
+  installationToken   String    @unique  // Token emitido por backend; validación/revocación
+  active              Boolean   @default(true)
+  revokedAt           DateTime?
+  notes               String?
+  appVersion          String?   // Versión de la app en el momento de activar (opcional)
+  createdAt           DateTime  @default(now())
+}
+
+// ========== PERFIL EMPRESA (singleton) ==========
+// Un único registro lógico: id fijo "singleton". Datos maestros para cotización/PDF (consumo futuro).
+
+model CompanyProfile {
+  id String @id @default("singleton")
+
+  logoRelativePath String?
+  logoMimeType     String?
+
+  commercialName   String?
+  legalName        String?
+  taxId            String?
+  businessActivity String?
+
+  address String?
+  commune String?
+  region  String?
+  country String?
+  phone   String?
+  email   String?
+  website String?
+
+  instagramUrl String?
+  facebookUrl  String?
+
+  bankName             String?
+  accountType          String?
+  accountNumber        String?
+  accountHolderName    String?
+  accountHolderTaxId   String?
+  transferReceiptEmail String?
+
+  generalNotes String?
+  quoteNote    String?
+  paymentTerms String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Nodos del organigrama (jerarquía, consultoría y datos de contacto).
+model OrganizationNode {
+  id       String  @id @default(cuid())
+  name     String
+  role     String
+  category String?
+  parentId String?
+  linkToId String?
+  photoUrl String?
+  email    String?
+  phone    String?
+  order    Int     @default(0)
+  active   Boolean @default(true)
+
+  parent   OrganizationNode?  @relation("OrgTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children OrganizationNode[] @relation("OrgTree")
+
+  linkTarget OrganizationNode?  @relation("OrgConsultLink", fields: [linkToId], references: [id], onDelete: SetNull)
+  linkedFrom OrganizationNode[] @relation("OrgConsultLink")
+
+  customEdgesFrom OrganizationCustomEdge[] @relation("OrgCustomEdgeFrom")
+  customEdgesTo   OrganizationCustomEdge[] @relation("OrgCustomEdgeTo")
+
+  @@index([parentId])
+  @@index([linkToId])
+}
+
+/// Conexión libre entre cargos (además del árbol y linkToId).
+model OrganizationCustomEdge {
+  id          String   @id @default(cuid())
+  fromNodeId  String
+  toNodeId    String
+  color       String   @default("#64748b")
+  strokeWidth Float    @default(2)
+  dashPattern String?
+  midOffsetX  Float    @default(0)
+  midOffsetY  Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  fromNode OrganizationNode @relation("OrgCustomEdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode   OrganizationNode @relation("OrgCustomEdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([fromNodeId, toNodeId])
+  @@index([fromNodeId])
+  @@index([toNodeId])
+}

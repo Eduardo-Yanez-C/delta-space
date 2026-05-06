@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "target": "ES2021"
+  },
+  "include": [
+    "prisma/**/*.ts",
+    "src/**/*.ts"
+  ]
+}

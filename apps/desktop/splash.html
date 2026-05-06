@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>Iniciando</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(160deg, #0f172a 0%, #1e293b 45%, #0f172a 100%);
+        color: #e2e8f0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
+      }
+      .brand {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: #f8fafc;
+        margin-bottom: 8px;
+        text-align: center;
+      }
+      .subtitle {
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #64748b;
+        margin-bottom: 28px;
+      }
+      .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid rgba(148, 163, 184, 0.25);
+        border-top-color: #38bdf8;
+        border-radius: 50%;
+        animation: spin 0.85s linear infinite;
+        margin-bottom: 22px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .status {
+        font-size: 13px;
+        line-height: 1.45;
+        color: #cbd5e1;
+        text-align: center;
+        max-width: 320px;
+        min-height: 2.6em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="brand">DELTA SPACE</div>
+    <div class="subtitle">Iniciando</div>
+    <div class="spinner" aria-hidden="true"></div>
+    <p class="status" id="status">Iniciando aplicación…</p>
+    <script>
+      (function () {
+        const el = document.getElementById("status");
+        const api = window.__DESKTOP__ && window.__DESKTOP__.splash;
+        if (api && typeof api.onPhase === "function") {
+          api.onPhase(function (text) {
+            if (typeof text === "string" && text.trim() && el) {
+              el.textContent = text;
+            }
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

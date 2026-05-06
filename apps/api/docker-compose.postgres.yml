@@ -1,0 +1,26 @@
+# Postgres local para desarrollo / pruebas de migración (opción B recomendada).
+# Uso desde apps/api:
+#   docker compose -f docker-compose.postgres.yml up -d
+# DATABASE_URL (ejemplo):
+#   postgresql://postgres:postgres@127.0.0.1:5432/delta_space_dev?schema=public
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: delta_space_dev
+    volumes:
+      - delta_space_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d delta_space_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  delta_space_pg_data:

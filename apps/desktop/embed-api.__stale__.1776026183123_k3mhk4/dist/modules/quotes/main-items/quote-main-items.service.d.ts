@@ -1,0 +1,106 @@
+import { Prisma } from "@prisma/client";
+import type { AuthUserPayload } from "../../auth/auth.service";
+import { PrismaService } from "../../../infra/prisma/prisma.service";
+import { QuoteVersionsService } from "../versions/quote-versions.service";
+import { CreateMainItemDto } from "./dto/create-main-item.dto";
+import { CreateLineDto } from "./dto/create-line.dto";
+import { UpdateLineDto } from "./dto/update-line.dto";
+import { UpdateMainItemDto } from "./dto/update-main-item.dto";
+export declare class QuoteMainItemsService {
+    private readonly prisma;
+    private readonly quoteVersionsService;
+    constructor(prisma: PrismaService, quoteVersionsService: QuoteVersionsService);
+    createMainItem(quoteId: string, versionId: string, dto: CreateMainItemDto, currentUser?: AuthUserPayload): Promise<{
+        id: string;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        description: string | null;
+        sortOrder: number;
+        quoteVersionId: string;
+        visibleInFinalQuote: boolean;
+        totalMode: string;
+        totalOverride: Prisma.Decimal | null;
+        sourceFromFvStudyKind: string | null;
+    }>;
+    updateMainItem(quoteId: string, versionId: string, mainItemId: string, dto: UpdateMainItemDto, currentUser?: AuthUserPayload): Promise<{
+        id: string;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        description: string | null;
+        sortOrder: number;
+        quoteVersionId: string;
+        visibleInFinalQuote: boolean;
+        totalMode: string;
+        totalOverride: Prisma.Decimal | null;
+        sourceFromFvStudyKind: string | null;
+    }>;
+    createLine(quoteId: string, versionId: string, mainItemId: string, dto: CreateLineDto, currentUser?: AuthUserPayload): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        sortOrder: number;
+        brandId: number | null;
+        visibleInFinalQuote: boolean;
+        quoteMainItemId: string;
+        productId: string | null;
+        categoryId: number | null;
+        modelId: number | null;
+        productNameSnapshot: string;
+        productDescriptionSnapshot: string | null;
+        categoryNameSnapshot: string | null;
+        brandNameSnapshot: string | null;
+        modelNameSnapshot: string | null;
+        currencySnapshot: string;
+        unitPriceSnapshot: Prisma.Decimal;
+        unitCostSnapshot: Prisma.Decimal | null;
+        discountPercentSnapshot: Prisma.Decimal | null;
+        marginPercentSnapshot: Prisma.Decimal | null;
+        quantity: Prisma.Decimal;
+        lineTotalSnapshot: Prisma.Decimal;
+        configSnapshot: string | null;
+        addOnSuggestionId: string | null;
+    }>;
+    private createLineManual;
+    private createLineFromCatalog;
+    updateLine(quoteId: string, versionId: string, lineId: string, dto: UpdateLineDto, currentUser?: AuthUserPayload): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        sortOrder: number;
+        brandId: number | null;
+        visibleInFinalQuote: boolean;
+        quoteMainItemId: string;
+        productId: string | null;
+        categoryId: number | null;
+        modelId: number | null;
+        productNameSnapshot: string;
+        productDescriptionSnapshot: string | null;
+        categoryNameSnapshot: string | null;
+        brandNameSnapshot: string | null;
+        modelNameSnapshot: string | null;
+        currencySnapshot: string;
+        unitPriceSnapshot: Prisma.Decimal;
+        unitCostSnapshot: Prisma.Decimal | null;
+        discountPercentSnapshot: Prisma.Decimal | null;
+        marginPercentSnapshot: Prisma.Decimal | null;
+        quantity: Prisma.Decimal;
+        lineTotalSnapshot: Prisma.Decimal;
+        configSnapshot: string | null;
+        addOnSuggestionId: string | null;
+    }>;
+    deleteLine(quoteId: string, versionId: string, lineId: string, currentUser?: AuthUserPayload): Promise<{
+        deleted: boolean;
+    }>;
+    duplicateLine(quoteId: string, versionId: string, lineId: string, currentUser?: AuthUserPayload): Promise<{
+        id: string;
+    }>;
+    duplicateMainItem(quoteId: string, versionId: string, mainItemId: string, currentUser?: AuthUserPayload): Promise<{
+        id: string;
+    }>;
+    private ensureQuoteEditable;
+    private ensureVersionBelongsToQuote;
+    private ensureMainItemBelongsToVersion;
+    private ensureLineBelongsToVersion;
+}

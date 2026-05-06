@@ -1,0 +1,13 @@
+{
+  "payload": {
+    "v": 1,
+    "kind": "renewal",
+    "licenseId": "LIC-TEST-001",
+    "licenseType": "INTERNAL",
+    "installationId": "f7c11fea-d280-45bd-982a-ddda77df24b3",
+    "validUntil": "2026-03-27T02:59:59.999Z",
+    "issuedAt": "2026-03-21T23:16:19.078Z",
+    "note": "Piloto 5 día(s) civiles — generate-license.js"
+  },
+  "sig": "602a97b50023e92ec7f97618adaec574e8fe1fa6f50e7366468f1bc0c22d4931"
+}
