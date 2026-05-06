@@ -1,4 +1,5 @@
-# API en monorepo (Railway con builder "Dockerfile").
+# Imagen solo para el workspace `api` (Railway: builder DOCKERFILE + dockerfilePath en apps/api/railway.json).
+# Nombre distinto de `Dockerfile` para no forzar build Docker en web/desktop del mismo repo.
 # Evita Railpack, que en algunos proyectos exige `secret JWT_SECRET` en la fase de build.
 FROM node:20-bookworm-slim
 WORKDIR /app
