@@ -1,0 +1,27 @@
+# API en monorepo (Railway con builder "Dockerfile").
+# Evita Railpack, que en algunos proyectos exige `secret JWT_SECRET` en la fase de build.
+FROM node:20-bookworm-slim
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json* ./
+COPY apps ./apps
+
+# Placeholders para `postinstall` → `prisma generate` y para el build. En runtime Railway inyecta los valores reales.
+ARG JWT_SECRET=dummy-build-only-min-32-chars-for-prisma-generate
+ENV JWT_SECRET=${JWT_SECRET}
+ARG DATABASE_URL=postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder?schema=public
+ENV DATABASE_URL=${DATABASE_URL}
+
+RUN npm ci
+
+COPY . .
+
+RUN npm run build --workspace=api
+
+ENV NODE_ENV=production
+EXPOSE 4000
+
+CMD ["npm", "run", "start", "--workspace=api"]

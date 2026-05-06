@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+.git
+.github
+**/.next
+**/dist
+apps/desktop/dist
+apps/lan-p2p/target
+**/target
+apps/desktop/embed-api.__stale__*
+**/*.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.md
+.cursor
+terminals
