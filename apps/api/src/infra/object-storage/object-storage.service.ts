@@ -25,7 +25,11 @@ export class ObjectStorageService {
   private readonly log = new Logger(ObjectStorageService.name);
 
   private driver(): "local" | "supabase" {
-    const d = (process.env.STORAGE_DRIVER || "local").trim().toLowerCase();
+    let d = (process.env.STORAGE_DRIVER || "local").trim();
+    if ((d.startsWith('"') && d.endsWith('"')) || (d.startsWith("'") && d.endsWith("'"))) {
+      d = d.slice(1, -1).trim();
+    }
+    d = d.toLowerCase();
     return d === "supabase" ? "supabase" : "local";
   }
 
