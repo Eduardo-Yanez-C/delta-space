@@ -89,8 +89,9 @@ export function getApiBase(): string {
  * Prioridad:
  * 1. `NEXT_PUBLIC_CONVERSATIONS_SOCKET_ORIGIN` — origen del Nest, ej. `http://192.168.1.10:4000` o URL completa con `/api`.
  * 2. Shell empaquetado (Next en :31337): `http://127.0.0.1:4000/api`.
- * 3. Navegador en LAN (hostname ≠ localhost): `http://<hostname>:4000/api`.
- * 4. Localhost / SSR: misma lógica que fallback de `getApiBase()` (`NEXT_PUBLIC_API_URL` o `http://localhost:4000/api`).
+ * 3. Web (cloud): usa `getApiBase()` (mismo backend que el resto de endpoints).
+ * 4. Navegador en LAN (hostname ≠ localhost) sin `NEXT_PUBLIC_API_BASE_URL`: `http://<hostname>:4000/api`.
+ * 5. Localhost / SSR: misma lógica que fallback de `getApiBase()` (`NEXT_PUBLIC_API_URL` o `http://localhost:4000/api`).
  */
 export function getLocalConversationsApiBase(): string {
   const envBase = resolveConversationsApiBaseFromEnv();
@@ -109,6 +110,13 @@ export function getLocalConversationsApiBase(): string {
     return normalizeApiBase(computeFallbackApiBase());
   }
 
+  // En web (cloud), conversaciones deben ir al mismo API base que el resto (no "localhost:4000").
+  const apiBase = getApiBase();
+  if (!isLikelyLocalApiBase(apiBase)) {
+    return normalizeApiBase(apiBase);
+  }
+
+  // Fallback LAN on-premise: si la app se sirve desde un host en red y no se configuró API base.
   const host = hostname.includes(":") && !hostname.startsWith("[") ? `[${hostname}]` : hostname;
   return normalizeApiBase(`http://${host}:4000/api`);
 }
