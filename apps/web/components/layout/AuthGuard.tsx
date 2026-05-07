@@ -18,6 +18,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/login";
   const isSetupPage = pathname === "/setup";
   const isDev = process.env.NODE_ENV === "development";
+  const envApiBase =
+    (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+      process.env.NEXT_PUBLIC_API_URL?.trim() ||
+      "").replace(/\/$/, "");
+  const envLooksConfigured =
+    !!envApiBase &&
+    envApiBase.startsWith("http") &&
+    !envApiBase.includes("localhost") &&
+    !envApiBase.includes("127.0.0.1");
   const isEmbedded =
     typeof window !== "undefined" &&
     new URL(window.location.href).searchParams.get("embedded") === "1";
@@ -27,7 +36,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     window.location.port === "31337" &&
     (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost");
   /** En desarrollo, ?embedded=1 o shell desktop empaquetado: no exigimos /setup por localStorage. */
-  const effectiveConfigured = isConfigured() || isDev || isEmbedded || isDesktopPackagedShell;
+  const effectiveConfigured =
+    isConfigured() || envLooksConfigured || isDev || isEmbedded || isDesktopPackagedShell;
 
   /**
    * Desktop empaquetado (?embedded=1): el API Nest vive siempre en :4000.
@@ -48,6 +58,18 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       installationToken: prev?.installationToken,
     });
   }, [isEmbedded, isDesktopPackagedShell]);
+
+  /**
+   * Cloud (Vercel): si ya viene `NEXT_PUBLIC_API_*` y no hay localStorage, no obligar a pasar por /setup.
+   * Persistimos la URL solo para evitar redirecciones y mantener el comportamiento uniforme.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!envLooksConfigured) return;
+    if (isEmbedded || isDesktopPackagedShell) return;
+    if (isConfigured()) return;
+    setLocalConfig({ apiBaseUrl: envApiBase });
+  }, [envLooksConfigured, envApiBase, isEmbedded, isDesktopPackagedShell]);
 
   // Primera ejecución: marcar config como revisada
   useEffect(() => {
