@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCan } from "../../../lib/useCan";
 import {
   applyCleanMarginHierarchy,
@@ -17,6 +18,7 @@ import {
   fetchLatestMarginTemplateSnapshot,
   fetchTechnicalValidations,
   refreshQuoteVersionFromStudy,
+  createTemplateFromQuoteVersion,
   updateClient,
   updateQuote,
   updateLine,
@@ -54,7 +56,6 @@ import {
 } from "../../../lib/margin-quote-identity";
 
 const FV_KINDS = ["PANELS", "INVERTER", "STRUCTURE"] as const;
-const CONNECTION_LABELS: Record<string, string> = { MONOFASICO: "monofásico", TRIFASICO: "trifásico" };
 
 function marginTechnicalDetailValue(key: MarginTechnicalKnownKey, raw: unknown): string {
   if (raw === undefined || raw === null) return "—";
@@ -74,42 +75,28 @@ function marginTechnicalDetailValue(key: MarginTechnicalKnownKey, raw: unknown):
   if (typeof raw === "string") return raw.trim() === "" ? "—" : raw;
   return String(raw);
 }
-const MOUNTING_LABELS: Record<string, string> = { TECHO: "techo", SUELO: "suelo", INCLINADO_FIJO: "inclinado fijo", SEGUIMIENTO: "seguimiento", OTRO: "otro" };
 
-/** Detecta si los ítems FV base (PANELS, INVERTER, STRUCTURE) están desalineados respecto del estudio actual (mismo criterio que C.3). */
+/**
+ * Indica si hace falta sincronizar desde el estudio: solo la cantidad de paneles en la línea FV de paneles.
+ * Las descripciones de línea no se reescriben al actualizar desde estudio; no las usamos para este aviso.
+ */
 function isFvOutOfSync(
   study: FvStudy | null,
   mainItems: QuoteMainItemDto[] | undefined,
   suggestedFromStudy: boolean,
 ): boolean {
   if (!study || !mainItems?.length) return false;
-  const connLabel = CONNECTION_LABELS[study.connectionType ?? ""] ?? study.connectionType ?? "";
-  const mountLabel = study.mountingType ? (MOUNTING_LABELS[study.mountingType] ?? study.mountingType) : "";
   const qty = study.cantidadPaneles ?? 0;
-  const wp = study.potenciaPorPanelWp;
-  const kwp = study.potenciaSistemaKwp ?? null;
 
   for (let i = 0; i < mainItems.length; i++) {
     const mainItem = mainItems[i] as QuoteMainItemDto & { sourceFromFvStudyKind?: string | null };
     const kind =
       mainItem.sourceFromFvStudyKind ??
       (suggestedFromStudy && mainItem.sortOrder >= 0 && mainItem.sortOrder <= 2 ? FV_KINDS[mainItem.sortOrder] : null);
-    if (!kind || !mainItem.lines?.length) continue;
+    if (kind !== "PANELS" || !mainItem.lines?.length) continue;
     const line = mainItem.lines[0];
     const lineQty = typeof line.quantity === "number" ? line.quantity : Number(line.quantity);
-    const lineDesc = (line.productDescriptionSnapshot ?? "").trim();
-
-    if (kind === "PANELS") {
-      const expectedDesc =
-        wp != null && kwp != null ? `${qty} unidades de ${wp} Wp (sistema ${kwp} kWp)` : `${qty} unidades`;
-      if (lineQty !== qty || lineDesc !== expectedDesc) return true;
-    } else if (kind === "INVERTER") {
-      const expectedDesc = kwp != null ? `Inversor ${connLabel} para sistema de ${kwp} kW` : `Inversor ${connLabel}`;
-      if (lineDesc !== expectedDesc) return true;
-    } else if (kind === "STRUCTURE") {
-      const expectedDesc = mountLabel ? `Estructura ${mountLabel} para ${qty} paneles` : `Estructura para ${qty} paneles`;
-      if (lineDesc !== expectedDesc) return true;
-    }
+    if (lineQty !== qty) return true;
   }
   return false;
 }
@@ -164,6 +151,7 @@ export function CotizacionDetalleView({
   onCreateVersion,
   onDuplicateCurrentVersion,
 }: Props) {
+  const router = useRouter();
   const canEdit = useCan("edit", "quote");
   const canEditClient = useCan("edit", "client");
   const canPriceOverride = useCan("priceOverride", "quote");
@@ -204,6 +192,7 @@ export function CotizacionDetalleView({
   const [technicalAlertsLoading, setTechnicalAlertsLoading] = useState(false);
   const [technicalAlertsError, setTechnicalAlertsError] = useState<string | null>(null);
   const [refreshFromStudyLoading, setRefreshFromStudyLoading] = useState(false);
+  const [saveAsTemplateLoading, setSaveAsTemplateLoading] = useState(false);
   const [togglingLineId, setTogglingLineId] = useState<string | null>(null);
   const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);
   const [duplicatingMainItemId, setDuplicatingMainItemId] = useState<string | null>(null);
@@ -794,8 +783,9 @@ export function CotizacionDetalleView({
                   >
                     {refreshFromStudyLoading ? "Actualizando…" : "Actualizar ítems FV desde estudio"}
                   </button>
-                  <span className="text-xs text-slate-500">
-                    Actualiza cantidad de paneles y descripciones técnicas; no modifica precios ni descuentos.
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Actualiza la cantidad de paneles (y el total de esa línea) según el estudio; no cambia textos de
+                    descripción ni precios ni descuentos.
                   </span>
                 </div>
               )}
@@ -875,6 +865,41 @@ export function CotizacionDetalleView({
                     Duplicar versión actual
                   </button>
                 )}
+                {!isMarginQuote && versionDetail?.status === "BORRADOR" && versionId && (
+                    <button
+                      type="button"
+                      disabled={saveAsTemplateLoading}
+                      onClick={() => {
+                        const defaultName = (quote.title?.trim() || "Plantilla desde cotización") + " (plantilla)";
+                        const name = window.prompt("Nombre de la nueva plantilla", defaultName);
+                        if (name === null) return;
+                        const trimmed = name.trim();
+                        if (!trimmed) {
+                          setActionError("Indique un nombre para la plantilla.");
+                          return;
+                        }
+                        setSaveAsTemplateLoading(true);
+                        setActionError(null);
+                        createTemplateFromQuoteVersion({
+                          quoteId: quote.id,
+                          versionId,
+                          name: trimmed,
+                        })
+                          .then((tpl) => {
+                            router.push(`/plantillas/${tpl.id}/editar`);
+                          })
+                          .catch((e) =>
+                            setActionError(
+                              e instanceof Error ? e.message : "Error al guardar como plantilla",
+                            ),
+                          )
+                          .finally(() => setSaveAsTemplateLoading(false));
+                      }}
+                      className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/70"
+                    >
+                      {saveAsTemplateLoading ? "Creando plantilla…" : "Guardar versión como plantilla"}
+                    </button>
+                  )}
               </>
             )}
           </div>

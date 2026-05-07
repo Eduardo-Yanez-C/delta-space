@@ -27,6 +27,8 @@ model User {
   suiteNavGrants String?
   /// Tope de tokens OpenAI (total_tokens) por mes calendario UTC para el asistente de suite; null = sin límite.
   suiteAgentMonthlyTokenLimit Int?
+  /// Tras esta fecha/hora el usuario no puede iniciar sesión; null = sin caducidad.
+  accessExpiresAt DateTime?
 
   roles         UserRole[]
   quotes        Quote[]    @relation("UserQuotes")

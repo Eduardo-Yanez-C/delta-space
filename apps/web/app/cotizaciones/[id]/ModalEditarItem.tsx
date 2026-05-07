@@ -59,7 +59,7 @@ export function ModalEditarItem({
       unitCostSnapshot?: number | null;
     } = {
       quantity,
-      discountPercent: discountPercent || undefined,
+      discountPercent: Math.min(100, Math.max(0, Number(discountPercent) || 0)),
     };
     if (canPriceOverride && unitPriceOverride.trim() !== "") {
       const override = parseFloat(unitPriceOverride.replace(",", "."));

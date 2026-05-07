@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation";
 import { ChatBubbleDock } from "../conversations/ChatBubbleDock";
 import { SuiteAgentRuntimeProvider } from "../suite-agent/SuiteAgentRuntimeProvider";
-import { SuiteAgentBubble } from "../suite-agent/SuiteAgentBubble";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { DataNodeBanner } from "./DataNodeBanner";
@@ -93,7 +92,7 @@ function getTitle(pathname: string): { title: string; subtitle?: string } {
         };
       }
       if (slug === "agentes-ia") {
-        return { title: t, subtitle: "Contexto por pantalla, adjuntos y próximo motor con herramientas" };
+        return { title: t, subtitle: "Chat SAM, resumen visual en panel de ventas y herramientas según pantalla" };
       }
       if (slug === "logistica") {
         return {
@@ -189,7 +188,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       {!hideChatDock && <ChatBubbleDock />}
-      {!hideChatDock && <SuiteAgentBubble />}
     </div>
     </SuiteAgentRuntimeProvider>
   );

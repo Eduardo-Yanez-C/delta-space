@@ -18,6 +18,8 @@ import { QuoteTemplatesService } from "./quote-templates.service";
 import { CreateQuoteFromTemplateDto } from "./dto/create-quote-from-template.dto";
 import { CreateQuoteTemplateDto } from "./dto/create-quote-template.dto";
 import { CreateTemplateLineDto } from "./dto/create-template-line.dto";
+import { CreateTemplateItemDto } from "./dto/create-template-item.dto";
+import { CreateTemplateFromQuoteDto } from "./dto/create-template-from-quote.dto";
 import { UpdateQuoteTemplateDto } from "./dto/update-quote-template.dto";
 import { UpdateTemplateItemDto } from "./dto/update-template-item.dto";
 import { UpdateTemplateLineDto } from "./dto/update-template-line.dto";
@@ -37,6 +39,16 @@ export class QuoteTemplatesController {
   @Roles("ADMIN", "VENTAS")
   createTemplate(@Body() body: CreateQuoteTemplateDto) {
     return this.quoteTemplatesService.createTemplate(body);
+  }
+
+  @Post("from-quote-version")
+  @UseGuards(RolesGuard)
+  @Roles("ADMIN", "VENTAS")
+  createTemplateFromQuoteVersion(
+    @Body() body: CreateTemplateFromQuoteDto,
+    @CurrentUser() user: AuthUserPayload,
+  ) {
+    return this.quoteTemplatesService.createTemplateFromQuoteVersion(body, user);
   }
 
   @Get(":id")
@@ -62,6 +74,16 @@ export class QuoteTemplatesController {
     return this.quoteTemplatesService.createQuoteFromTemplate(id, body, user);
   }
 
+  @Post(":templateId/items")
+  @UseGuards(RolesGuard)
+  @Roles("ADMIN", "VENTAS")
+  createTemplateItem(
+    @Param("templateId") templateId: string,
+    @Body() body: CreateTemplateItemDto,
+  ) {
+    return this.quoteTemplatesService.createTemplateItem(templateId, body);
+  }
+
   @Patch(":templateId/items/:itemId")
   @UseGuards(RolesGuard)
   @Roles("ADMIN", "VENTAS")
@@ -71,6 +93,16 @@ export class QuoteTemplatesController {
     @Body() body: UpdateTemplateItemDto,
   ) {
     return this.quoteTemplatesService.updateTemplateItem(templateId, itemId, body);
+  }
+
+  @Delete(":templateId/items/:itemId")
+  @UseGuards(RolesGuard)
+  @Roles("ADMIN", "VENTAS")
+  deleteTemplateItem(
+    @Param("templateId") templateId: string,
+    @Param("itemId") itemId: string,
+  ) {
+    return this.quoteTemplatesService.deleteTemplateItem(templateId, itemId);
   }
 
   @Post(":templateId/items/:itemId/lines")

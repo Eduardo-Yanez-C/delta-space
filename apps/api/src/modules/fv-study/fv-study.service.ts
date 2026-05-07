@@ -40,6 +40,20 @@ const STUDY_KWP_INCONSISTENT_RATIO = 0.2;
 function roundKwp2(n) {
     return Math.round(n * 100) / 100;
 }
+/** Texto de descripción de línea (catálogo): marca · modelo, sin cantidades en el texto. */
+function productBrandModelDescriptionSnapshot(product) {
+    if (!product)
+        return null;
+    const brand = String(product.brandNameFree ?? product.brand?.name ?? "").trim();
+    const model = String(product.modelNameFree ?? product.model?.name ?? "").trim();
+    if (brand && model)
+        return `${brand} · ${model}`;
+    if (brand)
+        return brand;
+    if (model)
+        return model;
+    return null;
+}
 /**
  * kWp para ítems sugeridos al crear cotización desde estudio: mantiene `studyKwp` si es > 0 y coherente
  * con paneles×Wp; si es null/0/NaN o claramente inconsistente, usa el valor derivado del layout.
@@ -759,19 +773,17 @@ export class FvStudyService {
             : "Suministro de paneles fotovoltaicos";
         const manualPanels = {
             productNameSnapshot: manualPanelsBaseName,
-            productDescriptionSnapshot: `${effectiveCantidadPaneles} unidades de ${effectivePotenciaPorPanelWp} Wp (sistema ${effectivePotenciaSistemaKwp} kWp)`,
+            productDescriptionSnapshot: `${effectivePotenciaPorPanelWp} Wp · sistema ${effectivePotenciaSistemaKwp} kWp`,
             quantity: effectiveCantidadPaneles,
         };
         const manualInverter = {
             productNameSnapshot: "Suministro de inversor",
-            productDescriptionSnapshot: `Inversor ${connLabel} para sistema de ${effectivePotenciaSistemaKwp} kW`,
+            productDescriptionSnapshot: `Inversor ${connLabel} · ${effectivePotenciaSistemaKwp} kW`,
             quantity: 1,
         };
         const manualStructure = {
             productNameSnapshot: "Estructura de montaje",
-            productDescriptionSnapshot: mountLabel
-                ? `Estructura ${mountLabel} para ${effectiveCantidadPaneles} paneles`
-                : `Estructura para ${effectiveCantidadPaneles} paneles`,
+            productDescriptionSnapshot: mountLabel ? `Estructura ${mountLabel}` : "Estructura de montaje",
             quantity: 1,
         };
         const designPanelProductId = (implantationDesign?.panelProductId ?? "").trim();
@@ -836,7 +848,7 @@ export class FvStudyService {
                                 brandId: result.product.brandId,
                                 modelId: result.product.modelId,
                                 productNameSnapshot: displayName,
-                                productDescriptionSnapshot: result.product.description ?? null,
+                                productDescriptionSnapshot: productBrandModelDescriptionSnapshot(result.product),
                                 categoryNameSnapshot: result.product.category?.name ?? null,
                                 brandNameSnapshot: result.product.brandNameFree ?? result.product.brand?.name ?? null,
                                 modelNameSnapshot: result.product.modelNameFree ?? result.product.model?.name ?? null,

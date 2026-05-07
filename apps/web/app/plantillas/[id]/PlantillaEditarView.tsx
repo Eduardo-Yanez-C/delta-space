@@ -10,7 +10,12 @@ import type {
   UpdateTemplateItemInput,
   UpdateTemplateLineInput,
 } from "../../../lib/api";
-import { updateTemplateItem, updateTemplateLine } from "../../../lib/api";
+import {
+  createTemplateItem,
+  deleteTemplateItem,
+  updateTemplateItem,
+  updateTemplateLine,
+} from "../../../lib/api";
 
 const SYSTEM_TYPE_OPTIONS = [
   { value: "ON_GRID", label: "On Grid" },
@@ -239,10 +244,37 @@ type ItemsAndLinesSectionProps = {
 };
 
 function ItemsAndLinesSection({ templateId, items, onRefresh }: ItemsAndLinesSectionProps) {
+  const [adding, setAdding] = useState(false);
+
+  async function handleAddMainBlock() {
+    const name = window.prompt("Nombre del bloque principal", "Nuevo bloque");
+    if (name === null) return;
+    const n = name.trim() || "Nuevo bloque";
+    setAdding(true);
+    try {
+      await createTemplateItem(templateId, { productNameSnapshot: n });
+      onRefresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo añadir el bloque");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleAddMainBlock}
+          disabled={adding}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+        >
+          {adding ? "Añadiendo…" : "+ Añadir bloque principal"}
+        </button>
+      </div>
       {items.length === 0 ? (
-        <p className="text-slate-500 text-sm">Esta plantilla no tiene ítems.</p>
+        <p className="text-slate-500 text-sm dark:text-slate-400">Esta plantilla no tiene ítems. Use el botón de arriba para crear el primero.</p>
       ) : (
         items.map((item) => (
           <ItemBlock
@@ -265,8 +297,29 @@ type ItemBlockProps = {
 
 function ItemBlock({ templateId, item, onRefresh }: ItemBlockProps) {
   const [showEditBlock, setShowEditBlock] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const lines = item.lines ?? [];
   const blockVisible = item.visibleInFinalQuoteDefault !== false;
+
+  async function handleDeleteBlock() {
+    if (
+      !window.confirm(
+        "¿Eliminar este bloque principal y todas sus líneas de la plantilla? Esta acción no se puede deshacer.",
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteTemplateItem(templateId, item.id);
+      onRefresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo eliminar el bloque");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-600 dark:bg-slate-700/40">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -278,13 +331,23 @@ function ItemBlock({ templateId, item, onRefresh }: ItemBlockProps) {
             <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{item.productDescriptionSnapshot}</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setShowEditBlock(true)}
-          className="btn-secondary shrink-0 self-start text-sm"
-        >
-          Editar bloque
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2 self-start">
+          <button
+            type="button"
+            onClick={() => setShowEditBlock(true)}
+            className="btn-secondary text-sm"
+          >
+            Editar bloque
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteBlock}
+            disabled={deleting}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200 dark:hover:bg-red-950/80"
+          >
+            {deleting ? "Eliminando…" : "Eliminar bloque"}
+          </button>
+        </div>
       </div>
       <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
         Cantidad: {item.quantityRule === "FIXED" ? item.quantityFixed ?? "—" : "Derivada de potencia"}

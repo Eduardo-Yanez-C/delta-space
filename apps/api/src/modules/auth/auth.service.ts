@@ -4,6 +4,14 @@ import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../infra/prisma/prisma.service";
 import { parseStoredSuiteNavGrants } from "../../common/suite-nav-grants";
 
+const LICENSE_EXPIRED_MESSAGE =
+  "Su licencia de acceso ha finalizado. Contacte al administrador para renovarla.";
+
+export function isUserAccessExpired(accessExpiresAt: Date | null | undefined): boolean {
+  if (accessExpiresAt == null) return false;
+  return Date.now() > new Date(accessExpiresAt).getTime();
+}
+
 export type AuthUserPayload = {
   id: string;
   email: string;
@@ -32,12 +40,15 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException("Credenciales inválidas");
     }
-    if (!user.active) {
-      throw new UnauthorizedException("Usuario inactivo. Contacte al administrador.");
-    }
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       throw new UnauthorizedException("Credenciales inválidas");
+    }
+    if (!user.active) {
+      throw new UnauthorizedException("Usuario inactivo. Contacte al administrador.");
+    }
+    if (isUserAccessExpired(user.accessExpiresAt)) {
+      throw new UnauthorizedException(LICENSE_EXPIRED_MESSAGE);
     }
     const payload: AuthUserPayload = {
       id: user.id,
@@ -71,6 +82,9 @@ export class AuthService {
       },
     });
     if (!user || !user.active) return null;
+    if (isUserAccessExpired(user.accessExpiresAt)) {
+      throw new UnauthorizedException(LICENSE_EXPIRED_MESSAGE);
+    }
     return {
       id: user.id,
       email: user.email,
@@ -101,6 +115,9 @@ export class AuthService {
       },
     });
     if (!user || !user.active) return null;
+    if (isUserAccessExpired(user.accessExpiresAt)) {
+      throw new UnauthorizedException(LICENSE_EXPIRED_MESSAGE);
+    }
     return {
       id: user.id,
       email: user.email,

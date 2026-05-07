@@ -209,6 +209,7 @@ export default function EditarUsuarioPage() {
                 roleIds: data.roleIds,
                 suiteNavGrants: data.suiteNavGrants,
                 suiteAgentMonthlyTokenLimit: data.suiteAgentMonthlyTokenLimit,
+                accessExpiresAt: data.accessExpiresAt,
               };
               await updateUser(id, payload);
               if (currentUser?.id === id) {

@@ -99,13 +99,13 @@ export function ModalAgregarManual({
           productDescriptionSnapshot: productDescriptionSnapshot.trim() || undefined,
           quantity,
           unitPriceSnapshot: price,
-          discountPercentSnapshot: discountPercent || undefined,
+          discountPercentSnapshot: Math.min(100, Math.max(0, Number(discountPercent) || 0)),
           currencySnapshot: currencySnapshot || "CLP",
           ...(showMarginCost ? { unitCostSnapshot: resolvedUnitCost } : {}),
         })
       : addQuoteItem(quoteId, versionId, {
           quantity,
-          discountPercent: discountPercent || undefined,
+          discountPercent: Math.min(100, Math.max(0, Number(discountPercent) || 0)),
           productNameSnapshot: name,
           productDescriptionSnapshot: productDescriptionSnapshot.trim() || undefined,
           categoryNameSnapshot: categoryNameSnapshot.trim() || undefined,

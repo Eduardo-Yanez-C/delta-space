@@ -429,11 +429,25 @@ export async function postDataCleanupExecute(body: {
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  const res = await fetch(`${getApiBase()}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email.trim(), password }),
-  });
+  const base = getApiBase();
+  let res: Response;
+  try {
+    res = await fetch(`${base}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim(), password }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const looksLikeNetwork =
+      e instanceof TypeError || /failed to fetch|networkerror|load failed|aborted|fetch/i.test(msg);
+    if (looksLikeNetwork) {
+      throw new Error(
+        `No se pudo conectar con la API en ${base}. Arranque el backend (Nest) en el puerto correcto; en la raíz del monorepo: npm run dev:api o npm run dev (web + API). Si usa otro host o puerto, defina NEXT_PUBLIC_API_BASE_URL en apps/web/.env.local.`,
+      );
+    }
+    throw e instanceof Error ? e : new Error(msg);
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message ?? "Credenciales inválidas");
@@ -1014,6 +1028,8 @@ export type User = {
   suiteNavGrants?: string[] | null;
   /** null = sin límite mensual (UTC) para el asistente IA de suite. */
   suiteAgentMonthlyTokenLimit?: number | null;
+  /** null = acceso sin fecha de fin de licencia (solo restricciones por rol/activo). */
+  accessExpiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -1026,6 +1042,8 @@ export type CreateUserInput = {
   active?: boolean;
   suiteNavGrants?: string[] | null;
   suiteAgentMonthlyTokenLimit?: number | null;
+  /** ISO 8601 o null: fin de licencia de acceso. Omitir = sin caducidad. */
+  accessExpiresAt?: string | null;
 };
 export type UpdateUserInput = {
   name?: string;
@@ -1034,6 +1052,8 @@ export type UpdateUserInput = {
   roleIds?: number[];
   suiteNavGrants?: string[] | null;
   suiteAgentMonthlyTokenLimit?: number | null;
+  /** null = quitar caducidad; ISO = fin de licencia. */
+  accessExpiresAt?: string | null;
 };
 
 export type SuiteAgentUsageMeResponse = {
@@ -5356,6 +5376,57 @@ export async function updateQuoteTemplate(id: string, data: UpdateQuoteTemplateI
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(nestHttpErrorMessage(err, "Error al actualizar plantilla"));
+  }
+  return res.json();
+}
+
+export async function createTemplateItem(
+  templateId: string,
+  body: { productNameSnapshot: string; itemType?: string },
+): Promise<QuoteTemplate> {
+  const res = await fetch(`${getApiBase()}/quote-templates/${encodeURIComponent(templateId)}/items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al crear bloque"));
+  }
+  return res.json();
+}
+
+export async function deleteTemplateItem(templateId: string, itemId: string): Promise<QuoteTemplate> {
+  const res = await fetch(
+    `${getApiBase()}/quote-templates/${encodeURIComponent(templateId)}/items/${encodeURIComponent(itemId)}`,
+    { method: "DELETE", headers: getAuthHeaders() },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al eliminar bloque"));
+  }
+  return res.json();
+}
+
+export type CreateTemplateFromQuoteVersionInput = {
+  quoteId: string;
+  versionId: string;
+  name: string;
+  systemType?: "ON_GRID" | "OFF_GRID" | "HYBRID";
+  targetPowerKwp?: number;
+};
+
+export async function createTemplateFromQuoteVersion(
+  body: CreateTemplateFromQuoteVersionInput,
+): Promise<QuoteTemplate> {
+  const res = await fetch(`${getApiBase()}/quote-templates/from-quote-version`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al crear plantilla desde cotización"));
   }
   return res.json();
 }

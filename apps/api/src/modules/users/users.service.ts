@@ -30,6 +30,8 @@ export type UserResponse = {
   suiteNavGrants: string[] | null;
   /** null = sin límite mensual (UTC) para el asistente IA de suite. */
   suiteAgentMonthlyTokenLimit: number | null;
+  /** null = licencia sin fecha de fin (acceso mientras esté activo). */
+  accessExpiresAt: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -53,6 +55,19 @@ function parseSuiteAgentMonthlyTokenLimit(raw: unknown): number | null {
   return n;
 }
 
+/** undefined = no cambiar; null = quitar caducidad; Date = fin de licencia. */
+function parseAccessExpiresAtInput(raw: unknown): Date | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  const s = typeof raw === "string" ? raw.trim() : String(raw).trim();
+  if (!s) return null;
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) {
+    throw new BadRequestException("La fecha de fin de licencia no es válida.");
+  }
+  return d;
+}
+
 function toUserResponse(user: {
   id: string;
   email: string;
@@ -63,6 +78,7 @@ function toUserResponse(user: {
   updatedAt: Date;
   suiteNavGrants?: string | null;
   suiteAgentMonthlyTokenLimit?: number | null;
+  accessExpiresAt?: Date | null;
   roles: { role: Role }[];
 }): UserResponse {
   return {
@@ -77,6 +93,7 @@ function toUserResponse(user: {
       user.suiteAgentMonthlyTokenLimit === undefined || user.suiteAgentMonthlyTokenLimit === null
         ? null
         : user.suiteAgentMonthlyTokenLimit,
+    accessExpiresAt: user.accessExpiresAt ? new Date(user.accessExpiresAt).toISOString() : null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -202,6 +219,10 @@ export class UsersService {
     if (dto.suiteAgentMonthlyTokenLimit !== undefined) {
       limitPayload.suiteAgentMonthlyTokenLimit = parseSuiteAgentMonthlyTokenLimit(dto.suiteAgentMonthlyTokenLimit);
     }
+    const expPayload: { accessExpiresAt?: Date | null } = {};
+    if (dto.accessExpiresAt !== undefined) {
+      expPayload.accessExpiresAt = parseAccessExpiresAtInput(dto.accessExpiresAt);
+    }
     const user = await this.prisma.user.create({
       data: {
         email,
@@ -211,6 +232,7 @@ export class UsersService {
         active: dto.active ?? true,
         ...grantsPayload,
         ...limitPayload,
+        ...expPayload,
       },
     });
     if (roleIds.length > 0) {
@@ -241,6 +263,7 @@ export class UsersService {
       active?: boolean;
       suiteNavGrants?: string | null;
       suiteAgentMonthlyTokenLimit?: number | null;
+      accessExpiresAt?: Date | null;
     } = {};
     if (dto.name !== undefined) {
       scalarData.name = dto.name?.trim() || null;
@@ -258,6 +281,9 @@ export class UsersService {
     }
     if (dto.suiteAgentMonthlyTokenLimit !== undefined) {
       scalarData.suiteAgentMonthlyTokenLimit = parseSuiteAgentMonthlyTokenLimit(dto.suiteAgentMonthlyTokenLimit);
+    }
+    if (dto.accessExpiresAt !== undefined) {
+      scalarData.accessExpiresAt = parseAccessExpiresAtInput(dto.accessExpiresAt);
     }
     await this.prisma.$transaction(async (tx) => {
       if (Object.keys(scalarData).length > 0) {

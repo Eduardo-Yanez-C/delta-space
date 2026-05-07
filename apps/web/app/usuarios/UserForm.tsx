@@ -15,6 +15,7 @@ type CreatePayload = {
   active: boolean;
   suiteNavGrants: string[] | null;
   suiteAgentMonthlyTokenLimit: number | null;
+  accessExpiresAt: string | null;
 };
 type UpdatePayload = {
   name?: string;
@@ -23,6 +24,7 @@ type UpdatePayload = {
   roleIds: number[];
   suiteNavGrants: string[] | null;
   suiteAgentMonthlyTokenLimit: number | null;
+  accessExpiresAt: string | null;
 };
 
 type Props =
@@ -58,6 +60,25 @@ function parseIaTokenLimitInput(raw: string): number | null {
   return n;
 }
 
+function utcEndOfCalendarDayIsoFromYmd(ymd: string): string {
+  const t = ymd.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    throw new Error("Use una fecha válida (AAAA-MM-DD).");
+  }
+  return `${t}T23:59:59.999Z`;
+}
+
+function licenseExpiresDateLabel(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (!Number.isFinite(d.getTime())) return iso;
+    return d.toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return iso;
+  }
+}
+
 export function UserForm(props: Props) {
   const isEdit = props.mode === "edit";
   const initialUser = isEdit ? props.initial : null;
@@ -70,6 +91,8 @@ export function UserForm(props: Props) {
     roleIds: isEdit && initialUser ? (initialUser.roles?.map((r) => r.id) ?? []) : [],
     active: isEdit && initialUser ? initialUser.active : true,
     iaTokenLimit: iaLimitFromUser(initialUser),
+    licenseUnlimited: !initialUser?.accessExpiresAt,
+    licenseEndDate: initialUser?.accessExpiresAt ? initialUser.accessExpiresAt.slice(0, 10) : "",
   });
   const [suiteGrants, setSuiteGrants] = useState<string[]>(() => initialSuiteGrantsFromUser(initialUser));
   const [saving, setSaving] = useState(false);
@@ -91,6 +114,8 @@ export function UserForm(props: Props) {
         roleIds: initialUser.roles?.map((r) => r.id) ?? [],
         active: initialUser.active,
         iaTokenLimit: iaLimitFromUser(initialUser),
+        licenseUnlimited: !initialUser.accessExpiresAt,
+        licenseEndDate: initialUser.accessExpiresAt ? initialUser.accessExpiresAt.slice(0, 10) : "",
       });
       setSuiteGrants(initialSuiteGrantsFromUser(initialUser));
     }
@@ -121,6 +146,16 @@ export function UserForm(props: Props) {
     try {
       const suiteNavGrants = normalizeGrantsForSubmit(suiteGrants);
       const suiteAgentMonthlyTokenLimit = parseIaTokenLimitInput(form.iaTokenLimit);
+      let accessExpiresAt: string | null;
+      if (form.licenseUnlimited) {
+        accessExpiresAt = null;
+      } else {
+        const d = form.licenseEndDate.trim();
+        if (!d) {
+          throw new Error("Indique la fecha de fin de licencia o marque «Sin fecha de fin».");
+        }
+        accessExpiresAt = utcEndOfCalendarDayIsoFromYmd(d);
+      }
       if (props.mode === "create") {
         await props.onSubmit({
           email: form.email.trim(),
@@ -131,6 +166,7 @@ export function UserForm(props: Props) {
           active: form.active,
           suiteNavGrants,
           suiteAgentMonthlyTokenLimit,
+          accessExpiresAt,
         });
       } else {
         await props.onSubmit({
@@ -140,6 +176,7 @@ export function UserForm(props: Props) {
           roleIds: form.roleIds,
           suiteNavGrants,
           suiteAgentMonthlyTokenLimit,
+          accessExpiresAt,
         });
       }
     } catch (e) {
@@ -214,6 +251,60 @@ export function UserForm(props: Props) {
           placeholder="Ej: Eduardo Yañez Concha"
         />
         <p className="mt-0.5 text-xs text-slate-500">Para header y documentos (se muestra como primer nombre + primer apellido).</p>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-800 dark:text-slate-200">
+          Licencia de acceso
+        </h3>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+          Tras la fecha indicada el usuario no podrá iniciar sesión ni usar la API hasta que un administrador amplíe la
+          licencia. Deje «Sin fecha de fin» para acceso sin caducidad por calendario.
+        </p>
+        {initialUser?.accessExpiresAt && (
+          <p className="mt-2 text-xs text-slate-700 dark:text-slate-300">
+            Estado actual: caduca el{" "}
+            <span className="font-semibold">{licenseExpiresDateLabel(initialUser.accessExpiresAt)}</span> (fin del día
+            UTC indicado).
+          </p>
+        )}
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="license-unlimited"
+            checked={form.licenseUnlimited}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                licenseUnlimited: e.target.checked,
+              }))
+            }
+            className="h-4 w-4 rounded border-slate-300 text-amber-600"
+          />
+          <label htmlFor="license-unlimited" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            Sin fecha de fin de licencia
+          </label>
+        </div>
+        {!form.licenseUnlimited && (
+          <div className="mt-3">
+            <label
+              htmlFor="license-end"
+              className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200"
+            >
+              Acceso permitido hasta (inclusive)
+            </label>
+            <input
+              id="license-end"
+              type="date"
+              value={form.licenseEndDate}
+              onChange={(e) => setForm((f) => ({ ...f, licenseEndDate: e.target.value }))}
+              className="input-field max-w-xs"
+            />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Se aplica hasta el final del día UTC de la fecha elegida.
+            </p>
+          </div>
+        )}
       </div>
 
       <div>

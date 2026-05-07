@@ -68,6 +68,11 @@ export class UsersController {
           ? null
           : Number(body.suiteAgentMonthlyTokenLimit);
     }
+    if (Object.prototype.hasOwnProperty.call(body, "accessExpiresAt")) {
+      const v = body.accessExpiresAt;
+      dto.accessExpiresAt =
+        v === null || v === undefined || v === "" ? null : typeof v === "string" ? v : String(v);
+    }
     return this.usersService.update(id, dto, actor);
   }
 

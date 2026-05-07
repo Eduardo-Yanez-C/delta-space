@@ -476,30 +476,11 @@ export class QuoteVersionsService {
             where: { id: quote.sourceFvStudyId },
             select: {
                 cantidadPaneles: true,
-                potenciaPorPanelWp: true,
-                potenciaSistemaKwp: true,
-                connectionType: true,
-                mountingType: true,
             },
         });
         if (!study) {
             throw new NotFoundException("Estudio FV no encontrado");
         }
-        const CONNECTION_LABELS = {
-            MONOFASICO: "monofásico",
-            TRIFASICO: "trifásico",
-        };
-        const MOUNTING_LABELS = {
-            TECHO: "techo",
-            SUELO: "suelo",
-            INCLINADO_FIJO: "inclinado fijo",
-            SEGUIMIENTO: "seguimiento",
-            OTRO: "otro",
-        };
-        const connLabel = CONNECTION_LABELS[study.connectionType ?? ""] ?? study.connectionType ?? "";
-        const mountLabel = study.mountingType
-            ? MOUNTING_LABELS[study.mountingType] ?? study.mountingType
-            : "";
         const FV_KINDS = ["PANELS", "INVERTER", "STRUCTURE"];
         for (const mainItem of version.mainItems) {
             const kind = mainItem.sourceFromFvStudyKind ??
@@ -514,35 +495,12 @@ export class QuoteVersionsService {
             if (kind === "PANELS") {
                 const quantity = study.cantidadPaneles ?? 0;
                 const lineTotal = Math.round(quantity * unitPrice * (1 - discount / 100) * 100) / 100;
-                const desc = study.potenciaPorPanelWp != null && study.potenciaSistemaKwp != null
-                    ? `${quantity} unidades de ${study.potenciaPorPanelWp} Wp (sistema ${study.potenciaSistemaKwp} kWp)`
-                    : `${quantity} unidades`;
                 await this.prisma.quoteItemLine.update({
                     where: { id: line.id },
                     data: {
                         quantity,
-                        productDescriptionSnapshot: desc,
                         lineTotalSnapshot: lineTotal,
                     },
-                });
-            }
-            else if (kind === "INVERTER") {
-                const desc = study.potenciaSistemaKwp != null
-                    ? `Inversor ${connLabel} para sistema de ${study.potenciaSistemaKwp} kW`
-                    : `Inversor ${connLabel}`;
-                await this.prisma.quoteItemLine.update({
-                    where: { id: line.id },
-                    data: { productDescriptionSnapshot: desc },
-                });
-            }
-            else if (kind === "STRUCTURE") {
-                const n = study.cantidadPaneles ?? 0;
-                const desc = mountLabel
-                    ? `Estructura ${mountLabel} para ${n} paneles`
-                    : `Estructura para ${n} paneles`;
-                await this.prisma.quoteItemLine.update({
-                    where: { id: line.id },
-                    data: { productDescriptionSnapshot: desc },
                 });
             }
         }

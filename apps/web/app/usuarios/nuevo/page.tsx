@@ -22,6 +22,7 @@ export default function NuevoUsuarioPage() {
             active: data.active ?? true,
             suiteNavGrants: data.suiteNavGrants,
             suiteAgentMonthlyTokenLimit: data.suiteAgentMonthlyTokenLimit,
+            accessExpiresAt: data.accessExpiresAt,
           });
           router.push("/usuarios?success=created");
         }}

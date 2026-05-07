@@ -44,7 +44,8 @@ export default function AgentesIaHubPage() {
       </ul>
       <p className="mt-6 text-sm text-slate-600 dark:text-slate-400">
         Use la burbuja <span className="font-medium text-violet-800 dark:text-violet-200">Asistente IA</span> abajo a la
-        izquierda: pestaña Chat para conversar, pestaña Contexto para resumen y copiar JSON.
+        izquierda: chat integrado; en el panel de ventas verá un resumen visual con KPIs (el contexto técnico sigue
+        enviándose al modelo automáticamente).
       </p>
       <div className="mt-8 flex flex-wrap gap-3">
         <Link

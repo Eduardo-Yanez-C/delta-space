@@ -78,7 +78,7 @@ export function ModalEditarLinea({
     } = {
       quantity,
       unitPriceSnapshot: price,
-      discountPercentSnapshot: discountPercent || undefined,
+      discountPercentSnapshot: Math.min(100, Math.max(0, Number(discountPercent) || 0)),
       visibleInFinalQuote,
     };
     if (isMarginQuote) {

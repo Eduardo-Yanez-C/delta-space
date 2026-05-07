@@ -14,10 +14,13 @@ import { commercialNameForQuoteLine } from "../../common/product-quote-display-n
 import type { CreateQuoteFromTemplateDto } from "./dto/create-quote-from-template.dto";
 import type { CreateQuoteTemplateDto } from "./dto/create-quote-template.dto";
 import type { CreateTemplateLineDto } from "./dto/create-template-line.dto";
+import type { CreateTemplateItemDto } from "./dto/create-template-item.dto";
+import type { CreateTemplateFromQuoteDto } from "./dto/create-template-from-quote.dto";
 import type { UpdateQuoteTemplateDto } from "./dto/update-quote-template.dto";
 import type { UpdateTemplateItemDto } from "./dto/update-template-item.dto";
 import type { UpdateTemplateLineDto } from "./dto/update-template-line.dto";
 import type { AuthUserPayload } from "../auth/auth.service";
+import { canAccessQuote } from "../quotes/quote-access.helper";
 
 const BASE_ITEMS: Record<
   string,
@@ -858,5 +861,146 @@ export class QuoteTemplatesService {
       throw new NotFoundException("Línea de plantilla no encontrada");
     await this.prisma.quoteTemplateLine.delete({ where: { id: lineId } });
     return { deleted: true };
+  }
+
+  async createTemplateItem(templateId: string, dto: CreateTemplateItemDto) {
+    const name = (dto.productNameSnapshot ?? "").trim();
+    if (!name) throw new BadRequestException("productNameSnapshot es obligatorio");
+    const template = await this.prisma.quoteTemplate.findFirst({
+      where: { id: templateId, active: true },
+      include: { items: { select: { sortOrder: true } } },
+    });
+    if (!template) throw new NotFoundException("Plantilla no encontrada o inactiva");
+    const maxSort = template.items.reduce((m, i) => Math.max(m, i.sortOrder), -1);
+    const rawType = (dto.itemType ?? "OTRO").trim().toUpperCase();
+    const itemType = rawType || "OTRO";
+    await this.prisma.quoteTemplateItem.create({
+      data: {
+        quoteTemplateId: templateId,
+        sortOrder: maxSort + 1,
+        itemType,
+        quantityRule: "FIXED",
+        quantityFixed: 1,
+        potenciaPorPanelWp: null,
+        productNameSnapshot: name,
+        productDescriptionSnapshot: null,
+        unitPriceDefault: 0,
+        visibleInFinalQuoteDefault: true,
+      },
+    });
+    return this.findOne(templateId);
+  }
+
+  async deleteTemplateItem(templateId: string, itemId: string) {
+    const item = await this.prisma.quoteTemplateItem.findFirst({
+      where: { id: itemId, quoteTemplateId: templateId },
+    });
+    if (!item) throw new NotFoundException("Ítem de plantilla no encontrado");
+    await this.prisma.quoteTemplateItem.delete({ where: { id: itemId } });
+    return this.findOne(templateId);
+  }
+
+  async createTemplateFromQuoteVersion(dto: CreateTemplateFromQuoteDto, currentUser: AuthUserPayload) {
+    const roles = currentUser.roles ?? [];
+    if (!hasSalesLikePrivileges(roles)) {
+      throw new ForbiddenException("Sin permiso para crear plantillas");
+    }
+    const name = (dto.name ?? "").trim();
+    if (!name) throw new BadRequestException("name es obligatorio");
+    const quote = await this.prisma.quote.findUnique({
+      where: { id: dto.quoteId },
+      select: { id: true, ownerId: true, salespersonId: true, quoteKind: true },
+    });
+    if (!quote || !canAccessQuote(currentUser, quote)) {
+      throw new NotFoundException("Cotización no encontrada");
+    }
+    if (quote.quoteKind === "MARGIN") {
+      throw new BadRequestException(
+        "Aún no se puede generar plantilla desde una cotización con margen. Use una cotización estándar.",
+      );
+    }
+    const version = await this.prisma.quoteVersion.findFirst({
+      where: { id: dto.versionId, quoteId: dto.quoteId },
+      include: {
+        mainItems: {
+          orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+          include: {
+            lines: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+          },
+        },
+      },
+    });
+    if (!version) throw new NotFoundException("Versión no encontrada");
+    if (!version.mainItems?.length) {
+      throw new BadRequestException(
+        "Esta versión no tiene bloques principales (ítems jerárquicos). No se puede copiar a plantilla.",
+      );
+    }
+    const systemType =
+      dto.systemType && ["ON_GRID", "OFF_GRID", "HYBRID"].includes(dto.systemType)
+        ? dto.systemType
+        : "ON_GRID";
+    const targetPowerKwp =
+      dto.targetPowerKwp != null && Number.isFinite(Number(dto.targetPowerKwp))
+        ? Number(dto.targetPowerKwp)
+        : 10;
+    const maxSortAgg = await this.prisma.quoteTemplate.aggregate({
+      _max: { sortOrder: true },
+    });
+    const templateSortOrder = (maxSortAgg._max.sortOrder ?? -1) + 1;
+    const template = await this.prisma.$transaction(async (tx) => {
+      const t = await tx.quoteTemplate.create({
+        data: {
+          name,
+          quoteKind: "STANDARD",
+          systemType,
+          targetPowerKwp,
+          description: `Generada desde cotización ${dto.quoteId} · versión ${dto.versionId}`,
+          sortOrder: templateSortOrder,
+          active: true,
+        },
+      });
+      for (const mi of version.mainItems) {
+        const blockName = (mi.name ?? "").trim() || "Bloque";
+        const item = await tx.quoteTemplateItem.create({
+          data: {
+            quoteTemplateId: t.id,
+            sortOrder: mi.sortOrder,
+            itemType: "OTRO",
+            quantityRule: "FIXED",
+            quantityFixed: 1,
+            potenciaPorPanelWp: null,
+            productNameSnapshot: blockName,
+            productDescriptionSnapshot: mi.description?.trim() || null,
+            unitPriceDefault: 0,
+            visibleInFinalQuoteDefault: mi.visibleInFinalQuote ?? true,
+          },
+        });
+        const lines = mi.lines ?? [];
+        for (let idx = 0; idx < lines.length; idx++) {
+          const ln = lines[idx];
+          const qty = Math.max(1, Math.round(toNum(ln.quantity)));
+          const src = ln.productId ? "FROM_CATALOG" : "MANUAL";
+          await tx.quoteTemplateLine.create({
+            data: {
+              quoteTemplateItemId: item.id,
+              sortOrder: idx,
+              source: src,
+              productId: ln.productId,
+              productNameSnapshot: ln.productNameSnapshot,
+              productDescriptionSnapshot: ln.productDescriptionSnapshot,
+              quantityRule: "FIXED",
+              quantityFixed: qty,
+              potenciaPorPanelWp: null,
+              unitPriceDefault: toNum(ln.unitPriceSnapshot),
+              currency: ln.currencySnapshot?.trim() || null,
+              visibleInFinalQuoteDefault: ln.visibleInFinalQuote ?? false,
+            },
+          });
+        }
+      }
+      return t;
+    });
+    return this.findOne(template.id);
   }
 }

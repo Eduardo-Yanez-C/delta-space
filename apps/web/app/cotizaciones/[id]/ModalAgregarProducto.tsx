@@ -97,7 +97,7 @@ export function ModalAgregarProducto({
     } = {
       productId: selectedProductId,
       quantity,
-      discountPercent: discountPercent || undefined,
+      discountPercent: Math.min(100, Math.max(0, Number(discountPercent) || 0)),
     };
     if (priceToUse) body.priceId = priceToUse;
     if (canPriceOverride && unitPriceOverride.trim() !== "") {
