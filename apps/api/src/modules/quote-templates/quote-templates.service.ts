@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { hasSalesLikePrivileges } from "../auth/role-constants";
+import { hasGlobalAdminPrivileges, hasSalesLikePrivileges } from "../auth/role-constants";
 import { PrismaService } from "../../infra/prisma/prisma.service";
 import * as cnCommercial from "../quotes/commercial-number";
 import { mapQuoteResponse } from "../quotes/quote-response.mapper";
@@ -507,6 +507,9 @@ export class QuoteTemplatesService {
       where: { id: dto.clientId },
     });
     if (!client) throw new NotFoundException("Cliente no encontrado");
+    if (!hasGlobalAdminPrivileges(currentUser.roles) && client.companyId !== currentUser.companyId) {
+      throw new NotFoundException("Cliente no encontrado");
+    }
     let sourceFvStudyId: string | null = null;
     const rawStudyId = dto.fvStudyId?.trim();
     if (rawStudyId) {
@@ -537,6 +540,7 @@ export class QuoteTemplatesService {
         });
       const quote = await tx.quote.create({
         data: {
+          companyId: client.companyId,
           clientId: client.id,
           ownerId: currentUser.id,
           sourceQuoteTemplateId: template.id,

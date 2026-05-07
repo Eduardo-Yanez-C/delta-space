@@ -731,6 +731,7 @@ export class FvStudyService {
             where: { id: studyId },
             select: {
                 id: true,
+                companyId: true,
                 clientId: true,
                 title: true,
                 tipoProyecto: true,
@@ -808,6 +809,7 @@ export class FvStudyService {
             });
             const quote = await tx.quote.create({
                 data: {
+                    companyId: study.companyId,
                     clientId: study.clientId,
                     ownerId: currentUser.id,
                     sourceFvStudyId: study.id,

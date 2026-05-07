@@ -213,6 +213,9 @@ export class QuotesService {
     if (!client) {
       throw new NotFoundException("Cliente no encontrado");
     }
+    if (!hasGlobalAdminPrivileges(currentUser.roles) && client.companyId !== currentUser.companyId) {
+      throw new NotFoundException("Cliente no encontrado");
+    }
     const validUntil = dto.validUntil ? new Date(dto.validUntil) : null;
     if (dto.validUntil && Number.isNaN(validUntil.getTime())) {
       throw new BadRequestException("validUntil inválido");
@@ -235,6 +238,16 @@ export class QuotesService {
     );
     const sellerInitials =
       cnCommercial.sellerInitialsForCommercialNumber(sellerPayload);
+    let salespersonId: string | null = dto.salespersonId?.trim() || null;
+    if (salespersonId) {
+      const sp = await this.prisma.user.findUnique({
+        where: { id: salespersonId },
+        select: { companyId: true, active: true },
+      });
+      if (!sp?.active || sp.companyId !== client.companyId) {
+        throw new BadRequestException("Vendedor responsable no válido para este cliente.");
+      }
+    }
     const maxRetries = 3;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const { commercialSequence: nextSequence, commercialNumber } =
@@ -246,6 +259,7 @@ export class QuotesService {
       try {
         const created = await this.prisma.quote.create({
           data: {
+            companyId: client.companyId,
             clientId: dto.clientId,
             ownerId: currentUser.id,
             quoteKind,
@@ -263,7 +277,7 @@ export class QuotesService {
             deliveryDays: dto.deliveryDays ?? null,
             commercialStage: dto.commercialStage?.trim() ?? null,
             leadNumber: dto.leadNumber?.trim() ?? null,
-            salespersonId: dto.salespersonId?.trim() || null,
+            salespersonId,
           },
           include: {
         client: { select: { id: true, name: true } },
@@ -372,6 +386,29 @@ export class QuotesService {
           );
         }
         sourceFvStudyId = study.id;
+      }
+    }
+    if (dto.salespersonId !== undefined) {
+      const sid = dto.salespersonId?.trim() || null;
+      if (sid) {
+        let tenantId: string | null = quote.companyId ?? null;
+        if (!tenantId) {
+          const c = await this.prisma.client.findUnique({
+            where: { id: quote.clientId },
+            select: { companyId: true },
+          });
+          tenantId = c?.companyId ?? null;
+        }
+        if (!tenantId) {
+          throw new BadRequestException("No se pudo validar la empresa de la cotización.");
+        }
+        const sp = await this.prisma.user.findUnique({
+          where: { id: sid },
+          select: { companyId: true, active: true },
+        });
+        if (!sp?.active || sp.companyId !== tenantId) {
+          throw new BadRequestException("Vendedor responsable no válido para esta cotización.");
+        }
       }
     }
     const updated = await this.prisma.quote.update({
