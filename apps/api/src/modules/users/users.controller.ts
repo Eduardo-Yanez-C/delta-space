@@ -19,6 +19,7 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UsersService } from "./users.service";
+import { OPERATIONAL_WRITE_ROLES } from "../auth/role-constants";
 
 @Controller("users")
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,6 +31,17 @@ export class UsersController {
   findAll(@Query("activeOnly") activeOnly: string | undefined) {
     const only = activeOnly === "true";
     return this.usersService.findAll(only);
+  }
+
+  /** Misma empresa que el actor; usable por ventas/técnicos (no solo administración). */
+  @Get("assignable-for-sales")
+  @Roles(...OPERATIONAL_WRITE_ROLES)
+  findAssignableForSales(
+    @Query("activeOnly") activeOnly: string | undefined,
+    @CurrentUser() actor: AuthUserPayload,
+  ) {
+    const only = activeOnly === "true";
+    return this.usersService.findAssignableForSales(only, actor);
   }
 
   @Get(":id")

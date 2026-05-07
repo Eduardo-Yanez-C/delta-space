@@ -1346,6 +1346,19 @@ export async function fetchUsers(activeOnly?: boolean): Promise<User[]> {
   if (!res.ok) throw new Error("Error al cargar usuarios");
   return res.json();
 }
+
+/** Usuarios de la misma empresa (vendedor responsable, filtros, PMO). No requiere rol de administración global. */
+export async function fetchAssignableSalesUsers(activeOnly?: boolean): Promise<User[]> {
+  const q = new URLSearchParams();
+  if (activeOnly === true) q.set("activeOnly", "true");
+  const qs = q.toString();
+  const res = await fetch(
+    `${getApiBase()}/users/assignable-for-sales${qs ? `?${qs}` : ""}`,
+    { headers: getAuthHeaders() },
+  );
+  if (!res.ok) throw new Error("Error al cargar usuarios asignables");
+  return res.json();
+}
 export async function fetchUser(id: string): Promise<User> {
   const res = await fetch(`${getApiBase()}/users/${id}`, { headers: getAuthHeaders() });
   if (!res.ok) {

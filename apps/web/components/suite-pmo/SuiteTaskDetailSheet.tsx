@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PatchSuiteTaskInput, SuiteTaskCustomFieldRow, SuiteTaskRow, User } from "../../lib/api";
-import { fetchUsers, patchSuiteTask } from "../../lib/api";
+import { fetchAssignableSalesUsers, patchSuiteTask } from "../../lib/api";
 import { formatIsoDateDDMMAAAA } from "../../lib/suite-format-plan-date";
 import type { TaskStatusConfig } from "../../lib/suite-task-status-config";
 import { statusPillFromConfig } from "../../lib/suite-task-status-config";
@@ -955,7 +955,7 @@ export function SuiteTaskDetailSheet({
 
   useEffect(() => {
     let c = false;
-    fetchUsers(true)
+    fetchAssignableSalesUsers(true)
       .then((list) => {
         if (!c) setPlanningUsers(list);
       })

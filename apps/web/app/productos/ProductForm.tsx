@@ -115,13 +115,16 @@ const initial = isEdit
   brandIdLatestRef.current = form.brandId;
 
   useEffect(() => {
-    Promise.all([fetchCategories(), fetchBrands(), fetchSuppliers()]).then(
-      ([c, b, s]) => {
+    Promise.all([fetchCategories(), fetchBrands(), fetchSuppliers()])
+      .then(([c, b, s]) => {
         setCategories(c);
         setBrands(b);
         setSuppliers(s.filter((x) => x.active));
-      }
-    );
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : "Error al cargar catálogo";
+        setError(msg);
+      });
   }, []);
 
   useEffect(() => {

@@ -392,7 +392,7 @@ export function UserForm(props: Props) {
           Marque las secciones visibles en la barra oscura. La lista coincide con el registro del menú en código
           (`suite-nav-registry.ts`): al incorporar nuevas vistas principales o subítems de Ventas o Logística, aparecerán aquí
           automáticamente. Si deja todas marcadas, el usuario tendrá acceso completo al menú (equivalente a no
-          restricción). Los administradores (ADMIN / ADMIN_DEV) siempre ven todo el menú.
+          restricción). Solo el rol desarrollador (ADMIN_DEV) ve siempre todo el menú; el rol ADMIN respeta estas casillas.
         </p>
         <div className="mt-4 space-y-3">
           {SUITE_NAV_REGISTRY.map((entry) =>

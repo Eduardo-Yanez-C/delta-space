@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { fetchUsers, type User } from "../../lib/api";
+import { fetchAssignableSalesUsers, type User } from "../../lib/api";
 
 /** Menú anclado arriba del botón (coordenada `bottom` en px respecto al viewport). */
 type DockGeom = { left: number; width: number; bottom: number; maxHeight: number };
@@ -325,7 +325,7 @@ export function SuiteActivityComposer({
   useEffect(() => {
     let cancelled = false;
     setUsersLoading(true);
-    fetchUsers(true)
+    fetchAssignableSalesUsers(true)
       .then((list) => {
         if (!cancelled) setMentionUsers(list);
       })

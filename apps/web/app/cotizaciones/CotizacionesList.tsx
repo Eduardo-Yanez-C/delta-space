@@ -7,7 +7,7 @@ import { formatDate, formatMoney } from "../../lib/format";
 import {
   fetchQuotes,
   fetchClients,
-  fetchUsers,
+  fetchAssignableSalesUsers,
   type FilterQuotesParams,
   type QuoteListItem,
   type Client,
@@ -38,7 +38,7 @@ export function CotizacionesList() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchClients(), fetchUsers()])
+    Promise.all([fetchClients(), fetchAssignableSalesUsers()])
       .then(([c, u]) => {
         if (!cancelled) {
           setClients(c);

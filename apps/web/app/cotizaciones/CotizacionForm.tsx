@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   fetchClients,
   createClient,
-  fetchUsers,
+  fetchAssignableSalesUsers,
   type Client,
   type CreateClientInput,
   type User,
@@ -116,7 +116,7 @@ export function CotizacionForm(props: Props) {
     fetchClients()
       .then(setClients)
       .catch(() => setError("Error al cargar clientes"));
-    fetchUsers(true)
+    fetchAssignableSalesUsers(true)
       .then(setUsers)
       .catch(() => {});
   }, []);

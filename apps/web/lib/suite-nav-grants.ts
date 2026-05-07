@@ -21,9 +21,9 @@ const ALLOWED = new Set(ALL_GRANT_KEYS_LIST);
 
 const HREF_TO_GRANT = buildSuiteNavHrefToGrantKeyMap();
 
-/** ADMIN / ADMIN_DEV ignoran la lista (acceso completo al menú suite). */
+/** Solo ADMIN_DEV ignora la lista (acceso completo al menú suite). ADMIN respeta `suiteNavGrants`. */
 export function suiteNavMenuAdminBypass(roles: string[] | undefined): boolean {
-  return !!roles?.some((r) => r === "ADMIN_DEV" || r === "ADMIN");
+  return !!roles?.some((r) => r === "ADMIN_DEV");
 }
 
 /**

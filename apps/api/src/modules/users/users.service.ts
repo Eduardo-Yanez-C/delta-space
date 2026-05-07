@@ -122,6 +122,25 @@ export class UsersService {
     return users.map((u) => toUserResponse(u));
   }
 
+  /**
+   * Usuarios de la misma empresa (para vendedor responsable, filtros de cotización, PMO, etc.).
+   * No expone el listado global de administración (`findAll`).
+   */
+  async findAssignableForSales(activeOnly: boolean, actor: AuthUserPayload) {
+    const where = {
+      companyId: actor.companyId,
+      ...(activeOnly === true ? { active: true } : {}),
+    };
+    const users = await this.prisma.user.findMany({
+      where,
+      orderBy: { email: "asc" },
+      include: {
+        roles: { include: { role: true } },
+      },
+    });
+    return users.map((u) => toUserResponse(u));
+  }
+
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
