@@ -186,7 +186,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               ? "flex min-h-0 max-w-none flex-1 flex-col overflow-hidden px-4 pt-3 pb-2 print:max-w-none print:p-0 md:px-5 md:pt-4 md:pb-3"
               : isWideContentRoute
                 ? "max-w-none px-4 py-4 print:max-w-none print:p-0 md:px-5 md:py-6"
-                : "mx-auto max-w-[1440px] p-6 print:max-w-none print:p-0 md:p-8"
+                : "w-full max-w-none px-4 py-5 print:max-w-none print:p-0 md:px-6 md:py-7 lg:px-8 lg:py-8"
           }
         >
           {children}
