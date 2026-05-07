@@ -73,6 +73,10 @@ export class UsersController {
       dto.accessExpiresAt =
         v === null || v === undefined || v === "" ? null : typeof v === "string" ? v : String(v);
     }
+    if (Object.prototype.hasOwnProperty.call(body, "companyId")) {
+      const v = body.companyId;
+      dto.companyId = v === null || v === undefined || v === "" ? undefined : String(v);
+    }
     return this.usersService.update(id, dto, actor);
   }
 

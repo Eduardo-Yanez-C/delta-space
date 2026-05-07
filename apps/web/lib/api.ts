@@ -204,12 +204,27 @@ export type AuthUser = {
   name: string | null;
   fullName: string | null;
   active: boolean;
+  companyId: string;
   roles: string[];
   /** null = sin restricción explícita en menú suite (comportamiento anterior). */
   suiteNavGrants?: string[] | null;
+  impersonatedBy?: { id: string; email: string } | null;
 };
 
 export type LoginResponse = { accessToken: string; user: AuthUser };
+
+export async function impersonateUser(userId: string): Promise<LoginResponse> {
+  const res = await fetch(`${getApiBase()}/auth/impersonate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ userId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "No se pudo impersonar"));
+  }
+  return res.json();
+}
 
 /** Respuesta de POST /installations/activate (activación de instalación/equipo). */
 export type ActivateInstallationResponse = {
@@ -462,6 +477,196 @@ export async function getMe(): Promise<AuthUser> {
   if (!res.ok) {
     if (res.status === 401) throw new Error("Unauthorized");
     throw new Error("Error al cargar sesión");
+  }
+  return res.json();
+}
+
+// ——— Companies (multi-empresa) ———
+export type Company = {
+  id: string;
+  name: string;
+  slug: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AuditLog = {
+  id: string;
+  companyId: string;
+  userId: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityCompanyId: string | null;
+  beforeJson: string | null;
+  afterJson: string | null;
+  metaJson: string | null;
+  createdAt: string;
+  user?: { id: string; email: string; name: string | null; fullName: string | null };
+  company?: { id: string; name: string; slug: string };
+};
+
+export async function fetchCompanies(): Promise<Company[]> {
+  const res = await fetch(`${getApiBase()}/companies`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al cargar empresas"));
+  }
+  return res.json();
+}
+
+export async function fetchCompany(id: string): Promise<Company> {
+  const res = await fetch(`${getApiBase()}/companies/${encodeURIComponent(id)}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al cargar empresa"));
+  }
+  return res.json();
+}
+
+export async function createCompany(body: { name: string; slug: string; active?: boolean }): Promise<Company> {
+  const res = await fetch(`${getApiBase()}/companies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al crear empresa"));
+  }
+  return res.json();
+}
+
+export async function updateCompany(
+  id: string,
+  body: { name?: string; slug?: string; active?: boolean },
+): Promise<Company> {
+  const res = await fetch(`${getApiBase()}/companies/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al actualizar empresa"));
+  }
+  return res.json();
+}
+
+export async function fetchAuditLogs(params?: {
+  take?: number;
+  companyId?: string;
+  userId?: string;
+  entityType?: string;
+  entityId?: string;
+}): Promise<AuditLog[]> {
+  const qs = new URLSearchParams();
+  if (params?.take) qs.set("take", String(params.take));
+  if (params?.companyId) qs.set("companyId", params.companyId);
+  if (params?.userId) qs.set("userId", params.userId);
+  if (params?.entityType) qs.set("entityType", params.entityType);
+  if (params?.entityId) qs.set("entityId", params.entityId);
+  const q = qs.toString();
+  const res = await fetch(`${getApiBase()}/admin/audit-logs${q ? `?${q}` : ""}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al cargar auditoría"));
+  }
+  return res.json();
+}
+
+export type UserInvitation = {
+  id: string;
+  companyId: string;
+  email: string;
+  tokenHash: string;
+  roleIdsJson: string | null;
+  nameHint: string | null;
+  fullNameHint: string | null;
+  active: boolean;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdByUserId: string;
+  acceptedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  company?: { id: string; name: string; slug: string };
+  createdBy?: { id: string; email: string; name: string | null; fullName: string | null };
+  acceptedBy?: { id: string; email: string; name: string | null; fullName: string | null };
+};
+
+export async function fetchUserInvitations(): Promise<UserInvitation[]> {
+  const res = await fetch(`${getApiBase()}/admin/user-invitations`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al cargar invitaciones"));
+  }
+  return res.json();
+}
+
+export async function createUserInvitation(body: {
+  email: string;
+  companyId: string;
+  roleIds?: number[];
+  expiresAt?: string | null;
+  nameHint?: string | null;
+  fullNameHint?: string | null;
+}): Promise<{ invitation: UserInvitation; token: string }> {
+  const res = await fetch(`${getApiBase()}/admin/user-invitations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al crear invitación"));
+  }
+  return res.json();
+}
+
+export async function acceptInvitation(body: {
+  token: string;
+  password: string;
+  name?: string | null;
+  fullName?: string | null;
+}): Promise<{ ok: true }> {
+  const res = await fetch(`${getApiBase()}/auth/accept-invitation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "No se pudo aceptar la invitación"));
+  }
+  return res.json();
+}
+
+export type CompanyUsageRow = {
+  companyId: string;
+  name: string;
+  slug: string;
+  active: boolean;
+  createdAt: string;
+  users: number;
+  quotesInRange: number;
+  fvStudiesInRange: number;
+  lastLoginAt: string | null;
+};
+
+export async function fetchCompaniesUsage(params?: { from?: string; to?: string }): Promise<{
+  range: { from: string; to: string };
+  companies: CompanyUsageRow[];
+}> {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  const q = qs.toString();
+  const res = await fetch(`${getApiBase()}/admin/companies/usage${q ? `?${q}` : ""}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al cargar uso por empresa"));
   }
   return res.json();
 }
@@ -1024,6 +1229,7 @@ export type User = {
   name: string | null;
   fullName: string | null;
   active: boolean;
+  companyId: string;
   roles: Role[];
   suiteNavGrants?: string[] | null;
   /** null = sin límite mensual (UTC) para el asistente IA de suite. */
@@ -1039,6 +1245,7 @@ export type CreateUserInput = {
   name?: string;
   fullName?: string;
   roleIds: number[];
+  companyId: string;
   active?: boolean;
   suiteNavGrants?: string[] | null;
   suiteAgentMonthlyTokenLimit?: number | null;
@@ -1050,6 +1257,7 @@ export type UpdateUserInput = {
   fullName?: string;
   active?: boolean;
   roleIds?: number[];
+  companyId?: string;
   suiteNavGrants?: string[] | null;
   suiteAgentMonthlyTokenLimit?: number | null;
   /** null = quitar caducidad; ISO = fin de licencia. */

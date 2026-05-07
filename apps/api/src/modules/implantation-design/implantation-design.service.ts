@@ -12,6 +12,11 @@ const MAX_ZOOM = 22;
 const PANEL_CATEGORY_SLUG = "paneles-fotovoltaicos";
 @Injectable()
 export class ImplantationDesignService {
+    storageKeyForCompany(companyId, key) {
+        const safeCompany = String(companyId || "").trim() || "company_default";
+        const safeKey = String(key || "").replace(/^\/+/, "").replace(/\\/g, "/");
+        return `${safeCompany}/${safeKey}`;
+    }
     constructor(
         private readonly prisma: PrismaService,
         private readonly fvStudyService: FvStudyService,
@@ -167,9 +172,15 @@ export class ImplantationDesignService {
     }
     async updateScreenshot(fvStudyId, file, currentUser) {
         await this.fvStudyService.findOne(fvStudyId, currentUser);
+        const studyCompany = await this.prisma.fvStudy.findUnique({
+            where: { id: fvStudyId },
+            select: { companyId: true },
+        });
+        const companyId = studyCompany?.companyId ?? currentUser.companyId ?? "company_default";
         const ext = file.mimetype === "image/png" ? "png" : "jpg";
         const filename = `${randomUUID()}.${ext}`;
         const relPath = `${SCREENSHOTS_SUBDIR}/${filename}`;
+        const storageKey = this.storageKeyForCompany(companyId, relPath);
         const contentType = file.mimetype === "image/png" ? "image/png" : "image/jpeg";
         const prior = await this.prisma.implantationDesign.findUnique({
             where: { fvStudyId },
@@ -177,7 +188,7 @@ export class ImplantationDesignService {
         });
         const oldKey = prior?.screenshotUrl ?? null;
         await this.objectStorage.putObject({
-            key: relPath,
+            key: storageKey,
             body: file.buffer,
             contentType,
         });
@@ -196,7 +207,7 @@ export class ImplantationDesignService {
                         centerLat,
                         centerLng,
                         zoom: 16,
-                        screenshotUrl: relPath,
+                        screenshotUrl: storageKey,
                     },
                     include: { placements: true },
                 });
@@ -204,16 +215,16 @@ export class ImplantationDesignService {
             else {
                 design = await this.prisma.implantationDesign.update({
                     where: { id: prior.id },
-                    data: { screenshotUrl: relPath },
+                    data: { screenshotUrl: storageKey },
                     include: { placements: { orderBy: { positionIndex: "asc" } } },
                 });
             }
         }
         catch (e) {
-            await this.objectStorage.removeObject(relPath);
+            await this.objectStorage.removeObject(storageKey);
             throw e;
         }
-        if (oldKey && oldKey !== relPath) {
+        if (oldKey && oldKey !== storageKey) {
             try {
                 this.assertScreenshotStorageKey(oldKey);
                 await this.objectStorage.removeObject(oldKey);

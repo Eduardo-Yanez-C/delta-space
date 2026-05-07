@@ -3,6 +3,8 @@ import type { Response } from "express";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import type { AuthUserPayload } from "../auth/auth.service";
 import {
   ROLE_ADMIN,
   ROLE_ADMIN_DEV,
@@ -29,13 +31,13 @@ export class QuoteDocumentCompanyProfileController {
   ) {}
 
   @Get("company-profile")
-  getForDocument() {
-    return this.companyProfileService.findOne();
+  getForDocument(@CurrentUser() user: AuthUserPayload) {
+    return this.companyProfileService.findOne(user.companyId);
   }
 
   @Get("company-profile/logo")
-  async getLogo(@Res() res: Response) {
-    const { buffer, mime } = await this.companyProfileService.getLogoFile();
+  async getLogo(@CurrentUser() user: AuthUserPayload, @Res() res: Response) {
+    const { buffer, mime } = await this.companyProfileService.getLogoFile(user.companyId);
     const contentType = mime.startsWith("image/")
       ? mime
       : "image/png";

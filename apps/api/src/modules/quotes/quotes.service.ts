@@ -97,9 +97,11 @@ export class QuotesService {
     }
     const roles = currentUser?.roles ?? [];
     if (roles.length > 0 && !hasGlobalAdminPrivileges(roles)) {
-      const visibility = quoteVisibilityWhereForUser(currentUser.id);
+      const visibility = quoteVisibilityWhereForUser(currentUser.id, currentUser.companyId);
       where =
         Object.keys(where).length > 0 ? { AND: [where, visibility] } : visibility;
+    } else if (currentUser?.companyId) {
+      // Admin global: por defecto ve todo (sin filtro). Si más adelante quieres “scope por empresa” en UI, se agrega aquí.
     }
     const quotes = await this.prisma.quote.findMany({
       where,

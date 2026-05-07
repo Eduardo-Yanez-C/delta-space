@@ -8,11 +8,12 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getMe, login as apiLogin, setAuthToken, type AuthUser } from "./api";
+import { getMe, impersonateUser, login as apiLogin, setAuthToken, type AuthUser } from "./api";
 import { registerDesktopChatNotify } from "./desktop-chat-notify";
 import { conversationsRealtime } from "./conversations-realtime";
 
 const STORAGE_KEY = "pv_quoting_token";
+const IMPERSONATION_ADMIN_TOKEN_KEY = "pv_quoting_impersonation_admin_token";
 const SESSION_CHECK_TIMEOUT_MS = 10000;
 
 type AuthContextValue = {
@@ -21,6 +22,8 @@ type AuthContextValue = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  impersonate: (userId: string) => Promise<void>;
+  stopImpersonation: () => Promise<void>;
   setUser: (user: AuthUser | null) => void;
 };
 
@@ -43,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserState(null);
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(IMPERSONATION_ADMIN_TOKEN_KEY);
     }
     router.push("/login");
   }, [router]);
@@ -55,11 +59,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserState(res.user);
       if (typeof window !== "undefined") {
         window.localStorage.setItem(STORAGE_KEY, res.accessToken);
+        window.localStorage.removeItem(IMPERSONATION_ADMIN_TOKEN_KEY);
       }
       router.push("/");
     },
     [router],
   );
+
+  const impersonate = useCallback(
+    async (userId: string) => {
+      if (typeof window === "undefined") return;
+      const currentToken = token ?? window.localStorage.getItem(STORAGE_KEY);
+      if (currentToken) {
+        window.localStorage.setItem(IMPERSONATION_ADMIN_TOKEN_KEY, currentToken);
+      }
+      const res = await impersonateUser(userId);
+      setAuthToken(res.accessToken);
+      setTokenState(res.accessToken);
+      setUserState(res.user);
+      window.localStorage.setItem(STORAGE_KEY, res.accessToken);
+      router.push("/");
+    },
+    [router, token],
+  );
+
+  const stopImpersonation = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    const adminToken = window.localStorage.getItem(IMPERSONATION_ADMIN_TOKEN_KEY);
+    if (!adminToken) return;
+    window.localStorage.removeItem(IMPERSONATION_ADMIN_TOKEN_KEY);
+    setAuthToken(adminToken);
+    setTokenState(adminToken);
+    window.localStorage.setItem(STORAGE_KEY, adminToken);
+    try {
+      const u = await getMe();
+      setUserState(u);
+    } catch {
+      // si falló, forzar logout limpio
+      conversationsRealtime.disconnect();
+      setAuthToken(null);
+      setTokenState(null);
+      setUserState(null);
+      window.localStorage.removeItem(STORAGE_KEY);
+      router.push("/login");
+      return;
+    }
+    router.push("/");
+  }, [router]);
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
@@ -129,6 +175,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     login,
     logout,
+    impersonate,
+    stopImpersonation,
     setUser,
   };
 

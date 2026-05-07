@@ -1,6 +1,7 @@
 import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import type { AuthUserPayload } from "../auth/auth.service";
 import { DashboardService } from "./dashboard.service";
 import { ExternalIndicatorsService } from "./external-indicators.service";
 
@@ -13,8 +14,8 @@ export class DashboardController {
     ) {}
 
     @Get()
-    getDashboard(@CurrentUser() user: unknown) {
-        return this.dashboardService.getDashboard(user as { id: string; roles?: string[] });
+    getDashboard(@CurrentUser() user: AuthUserPayload) {
+        return this.dashboardService.getDashboard(user);
     }
 
     @Get("external-indicators")

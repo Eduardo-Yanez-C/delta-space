@@ -27,7 +27,7 @@ const STUDY_STATUS_ORDER = [
     { status: "ARCHIVADO", label: "Archivado" },
 ] as const;
 
-type CurrentUserLike = { id: string; roles?: string[] };
+type CurrentUserLike = { id: string; companyId: string; roles?: string[] };
 
 @Injectable()
 export class DashboardService {
@@ -36,7 +36,7 @@ export class DashboardService {
     async getDashboard(currentUser: CurrentUserLike) {
         const roles = currentUser?.roles ?? [];
         const isAdmin = hasGlobalAdminPrivileges(roles);
-        const quoteWhere = isAdmin ? {} : quoteVisibilityWhereForUser(currentUser.id);
+        const quoteWhere = isAdmin ? {} : quoteVisibilityWhereForUser(currentUser.id, currentUser.companyId);
         const studyWhere: { ownerId?: string } = {};
         if (!isAdmin)
             studyWhere.ownerId = currentUser.id;

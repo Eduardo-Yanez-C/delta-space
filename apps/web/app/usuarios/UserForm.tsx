@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { fetchRoles, type Role, type User } from "../../lib/api";
+import { fetchCompanies, fetchRoles, type Company, type Role, type User } from "../../lib/api";
 import { SUITE_NAV_GRANT_KEYS, normalizeGrantsForSubmit } from "../../lib/suite-nav-grants";
 import { SUITE_NAV_REGISTRY } from "../../lib/suite-nav-registry";
 
@@ -16,6 +16,7 @@ type CreatePayload = {
   suiteNavGrants: string[] | null;
   suiteAgentMonthlyTokenLimit: number | null;
   accessExpiresAt: string | null;
+  companyId: string;
 };
 type UpdatePayload = {
   name?: string;
@@ -25,6 +26,7 @@ type UpdatePayload = {
   suiteNavGrants: string[] | null;
   suiteAgentMonthlyTokenLimit: number | null;
   accessExpiresAt: string | null;
+  companyId: string;
 };
 
 type Props =
@@ -83,6 +85,7 @@ export function UserForm(props: Props) {
   const isEdit = props.mode === "edit";
   const initialUser = isEdit ? props.initial : null;
   const [roles, setRoles] = useState<Role[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [form, setForm] = useState({
     email: isEdit && initialUser ? initialUser.email : "",
     password: "",
@@ -93,6 +96,7 @@ export function UserForm(props: Props) {
     iaTokenLimit: iaLimitFromUser(initialUser),
     licenseUnlimited: !initialUser?.accessExpiresAt,
     licenseEndDate: initialUser?.accessExpiresAt ? initialUser.accessExpiresAt.slice(0, 10) : "",
+    companyId: initialUser?.companyId ?? "company_default",
   });
   const [suiteGrants, setSuiteGrants] = useState<string[]>(() => initialSuiteGrantsFromUser(initialUser));
   const [saving, setSaving] = useState(false);
@@ -102,6 +106,12 @@ export function UserForm(props: Props) {
     fetchRoles()
       .then(setRoles)
       .catch(() => setError("Error al cargar roles"));
+  }, []);
+
+  useEffect(() => {
+    fetchCompanies()
+      .then(setCompanies)
+      .catch(() => setError("Error al cargar empresas"));
   }, []);
 
   useEffect(() => {
@@ -116,6 +126,7 @@ export function UserForm(props: Props) {
         iaTokenLimit: iaLimitFromUser(initialUser),
         licenseUnlimited: !initialUser.accessExpiresAt,
         licenseEndDate: initialUser.accessExpiresAt ? initialUser.accessExpiresAt.slice(0, 10) : "",
+        companyId: initialUser.companyId ?? "company_default",
       });
       setSuiteGrants(initialSuiteGrantsFromUser(initialUser));
     }
@@ -163,6 +174,7 @@ export function UserForm(props: Props) {
           name: form.name.trim() || undefined,
           fullName: form.fullName.trim() || undefined,
           roleIds: form.roleIds,
+          companyId: form.companyId,
           active: form.active,
           suiteNavGrants,
           suiteAgentMonthlyTokenLimit,
@@ -174,6 +186,7 @@ export function UserForm(props: Props) {
           fullName: form.fullName.trim() || undefined,
           active: form.active,
           roleIds: form.roleIds,
+          companyId: form.companyId,
           suiteNavGrants,
           suiteAgentMonthlyTokenLimit,
           accessExpiresAt,
@@ -251,6 +264,27 @@ export function UserForm(props: Props) {
           placeholder="Ej: Eduardo Yañez Concha"
         />
         <p className="mt-0.5 text-xs text-slate-500">Para header y documentos (se muestra como primer nombre + primer apellido).</p>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Empresa</label>
+        <select
+          value={form.companyId}
+          onChange={(e) => setForm((f) => ({ ...f, companyId: e.target.value }))}
+          className="input-field"
+        >
+          {companies.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} {c.active === false ? "(inactiva)" : ""}
+            </option>
+          ))}
+          {companies.length === 0 && (
+            <option value={form.companyId}>Cargando…</option>
+          )}
+        </select>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Determina qué datos y archivos verá el usuario (multi-empresa).
+        </p>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/40">

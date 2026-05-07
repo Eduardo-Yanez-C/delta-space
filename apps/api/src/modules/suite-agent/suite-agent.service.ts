@@ -591,7 +591,7 @@ export class SuiteAgentService {
           return { text: JSON.stringify({ error: "Sin permiso para consultar clientes con este perfil." }), tasksMutated: false };
         }
         const q = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
-        const all = await this.clientsService.findAll();
+        const all = await this.clientsService.findAll(user);
         const filtered = q
           ? all.filter((c) => (c.name ?? "").toLowerCase().includes(q))
           : all.slice(0, 40);

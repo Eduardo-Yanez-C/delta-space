@@ -1,7 +1,9 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { APP_INTERCEPTOR } from "@nestjs/core";
 import { ObjectStorageModule } from "./infra/object-storage/object-storage.module";
 import { PrismaModule } from "./infra/prisma/prisma.module";
+import { RequestContextInterceptor } from "./infra/request-context.interceptor";
 import { AuthModule } from "./modules/auth/auth.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { BrandsModule } from "./modules/brands/brands.module";
@@ -37,6 +39,10 @@ import { InventoryModule } from "./modules/inventory/inventory.module";
 import { LogisticsInternationalModule } from "./modules/logistics-international/logistics-international.module";
 import { TransportContractsModule } from "./modules/transport-contracts/transport-contracts.module";
 import { TransportVariablesModule } from "./modules/transport-variables/transport-variables.module";
+import { CompaniesModule } from "./modules/companies/companies.module";
+import { AuditLogModule } from "./modules/audit-log/audit-log.module";
+import { UserInvitationsModule } from "./modules/user-invitations/user-invitations.module";
+import { AdminCompaniesUsageModule } from "./modules/admin-companies-usage/admin-companies-usage.module";
 
 @Module({
   imports: [
@@ -58,6 +64,10 @@ import { TransportVariablesModule } from "./modules/transport-variables/transpor
     AuthModule,
     DashboardModule,
     UsersModule,
+    CompaniesModule,
+    AuditLogModule,
+    UserInvitationsModule,
+    AdminCompaniesUsageModule,
     ClientsModule,
     CategoriesModule,
     BrandsModule,
@@ -84,5 +94,6 @@ import { TransportVariablesModule } from "./modules/transport-variables/transpor
     TransportContractsModule,
     TransportVariablesModule,
   ],
+  providers: [{ provide: APP_INTERCEPTOR, useClass: RequestContextInterceptor }],
 })
 export class AppModule {}

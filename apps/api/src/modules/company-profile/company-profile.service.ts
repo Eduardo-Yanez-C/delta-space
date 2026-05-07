@@ -10,7 +10,6 @@ import { PrismaService } from "../../infra/prisma/prisma.service";
 import { ObjectStorageService } from "../../infra/object-storage/object-storage.service";
 import {
   COMPANY_LOGO_SUBDIR,
-  COMPANY_PROFILE_ID,
 } from "./company-profile.constants";
 import type { UpdateCompanyProfileDto } from "./dto/update-company-profile.dto";
 
@@ -122,9 +121,9 @@ export class CompanyProfileService {
     };
   }
 
-  emptyResponse() {
+  emptyResponse(companyId: string) {
     return {
-      id: COMPANY_PROFILE_ID,
+      companyId,
       hasLogo: false,
       logoMimeType: null,
       commercialName: null,
@@ -154,15 +153,15 @@ export class CompanyProfileService {
     };
   }
 
-  async findOne() {
+  async findOne(companyId: string) {
     const row = await this.prisma.companyProfile.findUnique({
-      where: { id: COMPANY_PROFILE_ID },
+      where: { companyId },
     });
-    if (!row) return this.emptyResponse();
+    if (!row) return this.emptyResponse(companyId);
     return this.toResponse(row);
   }
 
-  async update(dto: UpdateCompanyProfileDto) {
+  async update(companyId: string, dto: UpdateCompanyProfileDto) {
     const patch: Record<string, string | null> = {};
     const keys = [
       "commercialName",
@@ -194,12 +193,12 @@ export class CompanyProfileService {
       }
     }
     if (Object.keys(patch).length === 0) {
-      return this.findOne();
+      return this.findOne(companyId);
     }
     const row = await this.prisma.companyProfile.upsert({
-      where: { id: COMPANY_PROFILE_ID },
+      where: { companyId },
       create: {
-        id: COMPANY_PROFILE_ID,
+        companyId,
         commercialName: patch.commercialName ?? null,
         legalName: patch.legalName ?? null,
         taxId: patch.taxId ?? null,
@@ -228,7 +227,7 @@ export class CompanyProfileService {
     return this.toResponse(row);
   }
 
-  async uploadLogo(file: { buffer: Buffer; mimetype: string; size?: number }) {
+  async uploadLogo(companyId: string, file: { buffer: Buffer; mimetype: string; size?: number }) {
     if (!file?.buffer?.length) {
       throw new BadRequestException(
         "Se requiere un archivo de imagen (campo 'file').",
@@ -243,29 +242,30 @@ export class CompanyProfileService {
     }
     const filename = `${randomUUID()}${extForMime(mime)}`;
     const relativePath = `${COMPANY_LOGO_SUBDIR}/${filename}`;
+    const storageKey = `${companyId}/${relativePath}`;
     const existing = await this.prisma.companyProfile.findUnique({
-      where: { id: COMPANY_PROFILE_ID },
+      where: { companyId },
     });
     const oldRel = existing?.logoRelativePath ?? null;
     await this.objectStorage.putObject({
-      key: relativePath,
+      key: storageKey,
       body: file.buffer,
       contentType: mime,
     });
     try {
       const row = await this.prisma.companyProfile.upsert({
-        where: { id: COMPANY_PROFILE_ID },
+        where: { companyId },
         create: {
-          id: COMPANY_PROFILE_ID,
-          logoRelativePath: relativePath,
+          companyId,
+          logoRelativePath: storageKey,
           logoMimeType: mime,
         },
         update: {
-          logoRelativePath: relativePath,
+          logoRelativePath: storageKey,
           logoMimeType: mime,
         },
       });
-      if (oldRel && oldRel !== relativePath) {
+      if (oldRel && oldRel !== storageKey) {
         try {
           await this.objectStorage.removeObject(oldRel);
         } catch {
@@ -275,7 +275,7 @@ export class CompanyProfileService {
       return this.toResponse(row);
     } catch (e) {
       try {
-        await this.objectStorage.removeObject(relativePath);
+        await this.objectStorage.removeObject(storageKey);
       } catch {
         /* ignore */
       }
@@ -283,14 +283,14 @@ export class CompanyProfileService {
     }
   }
 
-  async deleteLogo() {
+  async deleteLogo(companyId: string) {
     const existing = await this.prisma.companyProfile.findUnique({
-      where: { id: COMPANY_PROFILE_ID },
+      where: { companyId },
     });
-    if (!existing) return this.emptyResponse();
+    if (!existing) return this.emptyResponse(companyId);
     const oldRel = existing.logoRelativePath;
     const row = await this.prisma.companyProfile.update({
-      where: { id: COMPANY_PROFILE_ID },
+      where: { companyId },
       data: { logoRelativePath: null, logoMimeType: null },
     });
     if (oldRel) {
@@ -304,9 +304,9 @@ export class CompanyProfileService {
   }
 
   /** Bytes del logo para enviar por HTTP (disco local o Supabase según `STORAGE_DRIVER`). */
-  async getLogoFile() {
+  async getLogoFile(companyId: string) {
     const row = await this.prisma.companyProfile.findUnique({
-      where: { id: COMPANY_PROFILE_ID },
+      where: { companyId },
     });
     if (!row?.logoRelativePath) {
       throw new NotFoundException("No hay logo configurado.");

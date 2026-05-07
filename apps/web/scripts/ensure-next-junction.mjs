@@ -27,6 +27,10 @@ function isOneDrivePath(p) {
 function shouldSkip() {
   if (process.env.NEXT_NO_ONEDRIVE_DIST === "1") return true;
   if (process.env.BUILD_DESKTOP === "1") return true;
+  // En build de producción necesitamos que `.next` viva dentro del proyecto
+  // (Next ejecuta código desde `.next/server` y debe poder resolver `react/*` subiendo a node_modules).
+  const lifecycle = String(process.env.npm_lifecycle_event ?? "").toLowerCase();
+  if (lifecycle === "build" || lifecycle === "prebuild") return true;
   if (process.platform !== "win32") return true;
   return !isOneDrivePath(webRoot);
 }
@@ -92,6 +96,39 @@ function createJunction(absTarget, absLink) {
 
 function main() {
   if (shouldSkip()) {
+    // Asegurar que `.next` sea local (no junction) en build.
+    const absLink = path.resolve(webRoot, ".next");
+    if (process.platform === "win32" && fs.existsSync(absLink)) {
+      try {
+        const out = execFileSync(
+          "powershell.exe",
+          [
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            `$p='${escapePsSingle(absLink)}'; if (Test-Path -LiteralPath $p) { $i = Get-Item -LiteralPath $p -Force; if ($null -ne $i.LinkType -and $i.LinkType -eq 'Junction') { 'junction' } else { 'other' } }`,
+          ],
+          { stdio: "pipe", windowsHide: true },
+        )
+          .toString()
+          .trim()
+          .toLowerCase();
+        if (out === "junction") {
+          const rp = (() => {
+            try {
+              return fs.realpathSync.native ? fs.realpathSync.native(absLink) : fs.realpathSync(absLink);
+            } catch {
+              return null;
+            }
+          })();
+          removeNextLinkOrDir(absLink);
+          fs.mkdirSync(absLink, { recursive: true });
+          console.log(`[ensure-next-junction] build: .next local (se quitó junction${rp ? ` a ${rp}` : ""})`);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     return;
   }
 

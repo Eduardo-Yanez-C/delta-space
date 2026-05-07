@@ -87,7 +87,7 @@ export class FvCalculationService {
   ) {
     const quote = await this.prisma.quote.findUnique({
       where: { id: quoteId },
-      select: { quoteKind: true, ownerId: true, salespersonId: true },
+      select: { quoteKind: true, ownerId: true, salespersonId: true, companyId: true },
     });
     if (!quote) {
       throw new NotFoundException("Cotización no encontrada");
@@ -117,7 +117,7 @@ export class FvCalculationService {
   ) {
     const quote = await this.prisma.quote.findUnique({
       where: { id: quoteId },
-      select: { quoteKind: true, ownerId: true, salespersonId: true },
+      select: { quoteKind: true, ownerId: true, salespersonId: true, companyId: true },
     });
     if (!quote) {
       throw new NotFoundException("Cotización no encontrada");

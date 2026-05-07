@@ -9,16 +9,18 @@ import { CompanyProfileService } from "./company-profile.service";
 @Controller("public/branding")
 export class PublicBrandingController {
   constructor(private readonly companyProfileService: CompanyProfileService) {}
+  // Login no conoce tenant aún: usamos branding de empresa default.
+  private readonly defaultCompanyId = "company_default";
 
   @Get("company-profile")
   async companyProfileSummary() {
-    const p = await this.companyProfileService.findOne();
+    const p = await this.companyProfileService.findOne(this.defaultCompanyId);
     return { hasLogo: p.hasLogo === true };
   }
 
   @Get("company-logo")
   async companyLogo(@Res() res: Response) {
-    const { buffer, mime } = await this.companyProfileService.getLogoFile();
+    const { buffer, mime } = await this.companyProfileService.getLogoFile(this.defaultCompanyId);
     const contentType = mime.startsWith("image/")
       ? mime
       : "image/png";

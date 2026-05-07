@@ -73,6 +73,17 @@ const PERMISSIONS: Record<string, Record<string, string[]>> = {
   commercialPerformance: {
     access: ADMIN_ONLY,
   },
+  /** Empresas (multi-empresa): solo administración global. */
+  companies: {
+    access: ADMIN_ONLY,
+  },
+  /** Auditoría (solo admin): ver acciones y cambios críticos. */
+  auditLog: {
+    access: ADMIN_ONLY,
+  },
+  companiesUsage: {
+    access: ADMIN_ONLY,
+  },
   quote: {
     read: ["ADMIN_DEV", "ADMIN", "VENDEDOR_TECNICO", "VENTAS", "INGENIERIA", "LECTURA"],
     create: COMMERCIAL_TECH,

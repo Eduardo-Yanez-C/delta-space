@@ -269,6 +269,12 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
     private readonly objectStorage: ObjectStorageService,
   ) {}
 
+  private storageKeyForCompany(companyId: string, key: string): string {
+    const safeCompany = String(companyId || "").trim() || "company_default";
+    const safeKey = String(key || "").replace(/^\/+/, "").replace(/\\/g, "/");
+    return `${safeCompany}/${safeKey}`;
+  }
+
   onModuleInit(): void {
     if (this.lanP2pBridge.isEnabled()) {
       this.p2pRetryTimer = setInterval(() => {
@@ -651,6 +657,7 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
             name: u.name ?? null,
             fullName: u.fullName ?? null,
             active: true,
+            companyId: "company_default",
           },
         });
         mergedRows += 1;
@@ -1730,6 +1737,7 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
           quoteKind: true,
           ownerId: true,
           salespersonId: true,
+          companyId: true,
         },
       });
       if (!quote || !canAccessQuote(authUser, quote)) {
@@ -2054,6 +2062,7 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
         } else if (msg.sharedEntity.entityType === "CLIENT") {
           const created = await this.prisma.client.create({
             data: {
+              companyId: "company_default",
               type: String(proposedImport.type ?? "EMPRESA"),
               name: String(proposedImport.name ?? snapshot.name ?? "Cliente compartido"),
               email: proposedImport.email != null ? String(proposedImport.email) : null,
@@ -2225,9 +2234,10 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
     const safeOriginal = this.sanitizeFileName(file.originalname ?? "archivo");
     const storedFileName = `${randomUUID()}${this.extFromOriginal(safeOriginal)}`;
     const relativePath = `${ATTACHMENTS_SUBDIR}/${storedFileName}`;
+    const storageKey = this.storageKeyForCompany(authUser.companyId, relativePath);
     const contentType = file.mimetype || "application/octet-stream";
     await this.objectStorage.putObject({
-      key: relativePath,
+      key: storageKey,
       body: file.buffer,
       contentType,
     });
@@ -2249,13 +2259,13 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
             originalFileName: safeOriginal,
             mimeType: contentType,
             sizeBytes: fileSize,
-            storagePath: relativePath,
+            storagePath: storageKey,
           },
         });
         return created;
       });
     } catch (e) {
-      await this.objectStorage.removeObject(relativePath);
+      await this.objectStorage.removeObject(storageKey);
       throw e;
     }
     await this.prisma.conversation.update({

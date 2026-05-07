@@ -51,10 +51,30 @@ const panelComercialNavItem = {
   label: "Panel comercial",
   icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
 };
+const empresasNavItem = {
+  href: "/empresas",
+  label: "Empresas",
+  icon: "M3 21h18M5 21V7a2 2 0 012-2h3m4 0h3a2 2 0 012 2v14M9 21V9m6 12V9",
+};
 const datosEmpresaNavItem = {
   href: "/datos-empresa",
   label: "Datos de empresa",
   icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+};
+const auditoriaNavItem = {
+  href: "/admin/auditoria",
+  label: "Auditoría",
+  icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+};
+const invitacionesNavItem = {
+  href: "/admin/invitaciones",
+  label: "Invitaciones",
+  icon: "M21 8a2 2 0 01-2 2H5a2 2 0 01-2-2m18 0V6a2 2 0 00-2-2H5a2 2 0 00-2 2v2m18 0l-9 6-9-6",
+};
+const usoEmpresasNavItem = {
+  href: "/admin/empresas/uso",
+  label: "Uso por empresa",
+  icon: "M11 3a1 1 0 012 0v18a1 1 0 01-2 0V3zM5 9a1 1 0 012 0v12a1 1 0 01-2 0V9zm12 4a1 1 0 012 0v8a1 1 0 01-2 0v-8z",
 };
 const preferenciasOrtografiaNavItem = {
   href: "/admin/preferencias/ortografia",
@@ -253,6 +273,10 @@ export function Sidebar() {
   const canAccessCompanyProfile = useCan("access", "companyProfile");
   const canAccessDataCleanup = useCan("access", "dataCleanup");
   const canAccessCommercialPerformance = useCan("access", "commercialPerformance");
+  const canAccessCompanies = useCan("access", "companies");
+  const canAccessAuditLog = useCan("access", "auditLog");
+  const canAccessUserInvites = useCan("access", "users");
+  const canAccessCompaniesUsage = useCan("access", "companiesUsage");
   const canReadQuotes = useCan("read", "quote");
   const canReadFvStudy = useCan("read", "fvStudy");
   const { user: authUser } = useAuth();
@@ -295,6 +319,10 @@ export function Sidebar() {
   const adminItems: NavItem[] = useMemo(() => {
     const out: NavItem[] = [];
     if (canAccessCommercialPerformance) out.push(panelComercialNavItem);
+    if (canAccessCompanies) out.push(empresasNavItem);
+    if (canAccessAuditLog) out.push(auditoriaNavItem);
+    if (canAccessUserInvites) out.push(invitacionesNavItem);
+    if (canAccessCompaniesUsage) out.push(usoEmpresasNavItem);
     if (canAccessInstallations) out.push(instalacionesNavItem);
     if (canManageLanNodes) out.push(nodosLanNavItem);
     if (canAccessOnPremiseLicense) out.push(licenciaOnPremiseNavItem);
@@ -308,6 +336,10 @@ export function Sidebar() {
     canAccessCompanyProfile,
     canAccessDataCleanup,
     canAccessCommercialPerformance,
+    canAccessCompanies,
+    canAccessAuditLog,
+    canAccessUserInvites,
+    canAccessCompaniesUsage,
   ]);
 
   const [adminOpen, setAdminOpen] = useState(false);

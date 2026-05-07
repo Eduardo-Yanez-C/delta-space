@@ -276,10 +276,13 @@ export class FvStudyService {
         private readonly prisma: PrismaService,
         private readonly quoteVersionsService: QuoteVersionsService,
     ) {}
-    async findAll(clientId, _currentUser) {
+    async findAll(clientId, currentUser) {
         const where = {};
         if (clientId)
             where.clientId = clientId;
+        if (currentUser && !roleConstants.hasGlobalAdminPrivileges(currentUser.roles ?? [])) {
+            where.companyId = currentUser.companyId;
+        }
         const list = await this.prisma.fvStudy.findMany({
             where,
             include: {
@@ -291,11 +294,14 @@ export class FvStudyService {
         });
         return list.map((row) => this.toResponse(row));
     }
-    async findByClientId(clientId) {
+    async findByClientId(clientId, currentUser) {
         const client = await this.prisma.client.findUnique({ where: { id: clientId } });
         if (!client)
             throw new NotFoundException("Cliente no encontrado");
-        return this.findAll(clientId, undefined);
+        if (currentUser && !roleConstants.hasGlobalAdminPrivileges(currentUser.roles ?? []) && client.companyId !== currentUser.companyId) {
+            throw new NotFoundException("Cliente no encontrado");
+        }
+        return this.findAll(clientId, currentUser);
     }
     async findOne(id, currentUser) {
         const study = await this.prisma.fvStudy.findUnique({
@@ -315,6 +321,9 @@ export class FvStudyService {
         const client = await this.prisma.client.findUnique({ where: { id: dto.clientId } });
         if (!client)
             throw new NotFoundException("Cliente no encontrado");
+        if (!roleConstants.hasGlobalAdminPrivileges(currentUser.roles ?? []) && client.companyId !== currentUser.companyId) {
+            throw new NotFoundException("Cliente no encontrado");
+        }
         this.validateMonthIndex(dto.referenceMonth, "referenceMonth");
         this.validateConnectionType(dto.connectionType);
         if (dto.systemType != null) {
@@ -360,6 +369,7 @@ export class FvStudyService {
         }
         const study = await this.prisma.fvStudy.create({
             data: {
+                companyId: currentUser.companyId,
                 clientId: dto.clientId,
                 ownerId: currentUser.id,
                 status: "DRAFT",
@@ -987,6 +997,8 @@ export class FvStudyService {
         const roles = currentUser.roles ?? [];
         if (roleConstants.hasGlobalAdminPrivileges(roles))
             return;
+        if (study.companyId && study.companyId !== currentUser.companyId)
+            throw new NotFoundException("Estudio FV no encontrado");
         if (study.ownerId === currentUser.id)
             return;
         if (roles.includes(roleConstants.ROLE_VENTAS_LEGACY) ||
@@ -999,6 +1011,8 @@ export class FvStudyService {
         const roles = currentUser.roles ?? [];
         if (roleConstants.hasGlobalAdminPrivileges(roles))
             return;
+        if (study.companyId && study.companyId !== currentUser.companyId)
+            throw new NotFoundException("Estudio FV no encontrado");
         if (study.ownerId === currentUser.id)
             return;
         if (roles.includes(roleConstants.ROLE_VENTAS_LEGACY) ||

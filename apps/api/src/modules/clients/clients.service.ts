@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "../../infra/prisma/prisma.service";
+import { hasGlobalAdminPrivileges } from "../auth/role-constants";
+import type { AuthUserPayload } from "../auth/auth.service";
 import type { CreateClientDto } from "./dto/create-client.dto";
 import type { UpdateClientDto } from "./dto/update-client.dto";
 
@@ -11,25 +13,28 @@ import type { UpdateClientDto } from "./dto/update-client.dto";
 export class ClientsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
-    return this.prisma.client.findMany({
-      orderBy: { name: "asc" },
-    });
+  async findAll(currentUser: AuthUserPayload) {
+    const where = hasGlobalAdminPrivileges(currentUser.roles) ? {} : { companyId: currentUser.companyId };
+    return this.prisma.client.findMany({ where, orderBy: { name: "asc" } });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, currentUser: AuthUserPayload) {
     const client = await this.prisma.client.findUnique({
       where: { id },
     });
     if (!client) {
       throw new NotFoundException(`Cliente con id ${id} no encontrado`);
     }
+    if (!hasGlobalAdminPrivileges(currentUser.roles) && client.companyId !== currentUser.companyId) {
+      throw new NotFoundException(`Cliente con id ${id} no encontrado`);
+    }
     return client;
   }
 
-  async create(dto: CreateClientDto) {
+  async create(dto: CreateClientDto, currentUser: AuthUserPayload) {
     return this.prisma.client.create({
       data: {
+        companyId: currentUser.companyId,
         type: dto.type,
         name: dto.name,
         taxId: dto.taxId ?? null,
@@ -41,8 +46,8 @@ export class ClientsService {
     });
   }
 
-  async update(id: string, dto: UpdateClientDto) {
-    await this.findOne(id);
+  async update(id: string, dto: UpdateClientDto, currentUser: AuthUserPayload) {
+    await this.findOne(id, currentUser);
     return this.prisma.client.update({
       where: { id },
       data: {
@@ -57,8 +62,8 @@ export class ClientsService {
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, currentUser: AuthUserPayload) {
+    await this.findOne(id, currentUser);
     const counts = await this.prisma.client.findUnique({
       where: { id },
       select: {

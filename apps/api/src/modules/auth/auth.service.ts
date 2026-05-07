@@ -3,6 +3,7 @@ import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../infra/prisma/prisma.service";
 import { parseStoredSuiteNavGrants } from "../../common/suite-nav-grants";
+import { AuditLogService } from "../audit-log/audit-log.service";
 
 const LICENSE_EXPIRED_MESSAGE =
   "Su licencia de acceso ha finalizado. Contacte al administrador para renovarla.";
@@ -18,9 +19,12 @@ export type AuthUserPayload = {
   name: string | null;
   fullName: string | null;
   active: boolean;
+  companyId: string;
   roles: string[];
   /** null = menú suite sin restricción explícita (legacy). */
   suiteNavGrants: string[] | null;
+  /** Si existe, el usuario actual está siendo impersonado por este actor. */
+  impersonatedBy?: { id: string; email: string } | null;
 };
 
 @Injectable()
@@ -28,6 +32,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly audit: AuditLogService,
   ) {}
 
   async login(email: string, password: string) {
@@ -50,12 +55,17 @@ export class AuthService {
     if (isUserAccessExpired(user.accessExpiresAt)) {
       throw new UnauthorizedException(LICENSE_EXPIRED_MESSAGE);
     }
+    // Registrar último login exitoso (no crítico).
+    this.prisma.user
+      .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+      .catch(() => null);
     const payload: AuthUserPayload = {
       id: user.id,
       email: user.email,
       name: user.name,
       fullName: user.fullName ?? null,
       active: user.active,
+      companyId: user.companyId,
       roles: user.roles.map((ur) => ur.role.name),
       suiteNavGrants: (() => {
         const raw = (user as { suiteNavGrants?: string | null }).suiteNavGrants;
@@ -74,7 +84,7 @@ export class AuthService {
     return { accessToken, user: payload };
   }
 
-  async validateUserById(userId: string) {
+  async validateUserById(userId: string, impersonatedByUserId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -85,12 +95,13 @@ export class AuthService {
     if (isUserAccessExpired(user.accessExpiresAt)) {
       throw new UnauthorizedException(LICENSE_EXPIRED_MESSAGE);
     }
-    return {
+    const base = {
       id: user.id,
       email: user.email,
       name: user.name,
       fullName: user.fullName ?? null,
       active: user.active,
+      companyId: user.companyId,
       roles: user.roles.map((ur) => ur.role.name),
       suiteNavGrants: (() => {
         const raw = (user as { suiteNavGrants?: string | null }).suiteNavGrants;
@@ -101,6 +112,15 @@ export class AuthService {
           return null;
         }
       })(),
+    } satisfies Omit<AuthUserPayload, "impersonatedBy">;
+    if (!impersonatedByUserId) return base;
+    const imp = await this.prisma.user.findUnique({
+      where: { id: impersonatedByUserId },
+      select: { id: true, email: true, active: true },
+    });
+    return {
+      ...base,
+      impersonatedBy: imp?.active ? { id: imp.id, email: imp.email } : null,
     };
   }
 
@@ -124,6 +144,7 @@ export class AuthService {
       name: user.name,
       fullName: user.fullName ?? null,
       active: user.active,
+      companyId: user.companyId,
       roles: user.roles.map((ur) => ur.role.name),
       suiteNavGrants: (() => {
         const raw = (user as { suiteNavGrants?: string | null }).suiteNavGrants;
@@ -145,5 +166,37 @@ export class AuthService {
     });
     if (!user?.active) return false;
     return bcrypt.compare(password, user.password);
+  }
+
+  async impersonate(actor: AuthUserPayload, targetUserId: string) {
+    if (!actor.roles.includes("ADMIN_DEV")) {
+      throw new UnauthorizedException("Solo ADMIN_DEV puede impersonar usuarios.");
+    }
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      include: { roles: { include: { role: true } } },
+    });
+    if (!target || !target.active) {
+      throw new UnauthorizedException("Usuario destino inactivo o no encontrado.");
+    }
+    if (isUserAccessExpired(target.accessExpiresAt)) {
+      throw new UnauthorizedException(LICENSE_EXPIRED_MESSAGE);
+    }
+
+    const accessToken = this.jwtService.sign(
+      { sub: target.id, imp_by: actor.id, email: target.email.trim().toLowerCase() },
+      { expiresIn: process.env.JWT_EXPIRES_IN ?? "7d" },
+    );
+
+    const user = await this.validateUserById(target.id, actor.id);
+    if (!user) throw new UnauthorizedException("Usuario destino no disponible");
+    await this.audit.write(actor, {
+      action: "LOGIN_AS",
+      entityType: "User",
+      entityId: target.id,
+      entityCompanyId: target.companyId,
+      meta: { targetEmail: target.email },
+    });
+    return { accessToken, user };
   }
 }

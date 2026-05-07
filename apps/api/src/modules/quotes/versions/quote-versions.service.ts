@@ -68,7 +68,7 @@ export class QuoteVersionsService {
     async findOne(quoteId, versionId, currentUser) {
         const qAccess = await this.prisma.quote.findUnique({
             where: { id: quoteId },
-            select: { quoteKind: true, ownerId: true, salespersonId: true },
+            select: { quoteKind: true, ownerId: true, salespersonId: true, companyId: true },
         });
         if (!qAccess) {
             throw new NotFoundException("Versión no encontrada");
@@ -414,7 +414,7 @@ export class QuoteVersionsService {
         const angles = new Set();
         if (design?.placements?.length) {
             for (const p of design.placements) {
-                const sid = p.stringId?.trim() || "—";
+                const sid = p.stringId?.trim() || "���";
                 byString.set(sid, (byString.get(sid) ?? 0) + 1);
                 const orient = p.orientationDeg;
                 if (orient != null)
@@ -603,7 +603,7 @@ export class QuoteVersionsService {
             throw new NotFoundException("Cotización no encontrada");
         const qRow = await this.prisma.quote.findUnique({
             where: { id: quoteId },
-            select: { quoteKind: true, ownerId: true, salespersonId: true },
+            select: { quoteKind: true, ownerId: true, salespersonId: true, companyId: true },
         });
         if (!qRow || !quoteAccess.canAccessQuote(currentUser, qRow)) {
             throw new NotFoundException("Cotización no encontrada");
@@ -751,7 +751,7 @@ export class QuoteVersionsService {
             throw new NotFoundException("Cotización no encontrada");
         const qRow = await this.prisma.quote.findUnique({
             where: { id: quoteId },
-            select: { quoteKind: true, ownerId: true, salespersonId: true },
+            select: { quoteKind: true, ownerId: true, salespersonId: true, companyId: true },
         });
         if (!qRow || !quoteAccess.canAccessQuote(currentUser, qRow)) {
             throw new NotFoundException("Cotización no encontrada");

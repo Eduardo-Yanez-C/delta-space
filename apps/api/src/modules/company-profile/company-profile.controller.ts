@@ -17,6 +17,8 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { RolesGuard } from "../auth/roles.guard";
 import { ROLE_ADMIN, ROLE_ADMIN_DEV } from "../auth/role-constants";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import type { AuthUserPayload } from "../auth/auth.service";
 import { CompanyProfileService } from "./company-profile.service";
 import { UpdateCompanyProfileDto } from "./dto/update-company-profile.dto";
 
@@ -27,13 +29,13 @@ export class CompanyProfileController {
   constructor(private readonly companyProfileService: CompanyProfileService) {}
 
   @Get()
-  getProfile() {
-    return this.companyProfileService.findOne();
+  getProfile(@CurrentUser() user: AuthUserPayload) {
+    return this.companyProfileService.findOne(user.companyId);
   }
 
   @Patch()
-  updateProfile(@Body() dto: UpdateCompanyProfileDto) {
-    return this.companyProfileService.update(dto);
+  updateProfile(@CurrentUser() user: AuthUserPayload, @Body() dto: UpdateCompanyProfileDto) {
+    return this.companyProfileService.update(user.companyId, dto);
   }
 
   @Post("logo")
@@ -42,13 +44,14 @@ export class CompanyProfileController {
   )
   uploadLogo(
     @UploadedFile() file: { buffer: Buffer; mimetype: string; size?: number } | undefined,
+    @CurrentUser() user: AuthUserPayload,
   ) {
     if (!file?.buffer) {
       throw new BadRequestException(
         "Se requiere un archivo de imagen (campo 'file').",
       );
     }
-    return this.companyProfileService.uploadLogo({
+    return this.companyProfileService.uploadLogo(user.companyId, {
       buffer: file.buffer,
       mimetype: file.mimetype,
       size: file.size,
@@ -56,13 +59,13 @@ export class CompanyProfileController {
   }
 
   @Delete("logo")
-  deleteLogo() {
-    return this.companyProfileService.deleteLogo();
+  deleteLogo(@CurrentUser() user: AuthUserPayload) {
+    return this.companyProfileService.deleteLogo(user.companyId);
   }
 
   @Get("logo")
-  async getLogo(@Res() res: Response) {
-    const { buffer, mime } = await this.companyProfileService.getLogoFile();
+  async getLogo(@CurrentUser() user: AuthUserPayload, @Res() res: Response) {
+    const { buffer, mime } = await this.companyProfileService.getLogoFile(user.companyId);
     const contentType = mime.startsWith("image/")
       ? mime
       : "image/png";

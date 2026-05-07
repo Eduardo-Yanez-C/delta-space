@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../infra/prisma/prisma.service";
+import { AuditLogService } from "../audit-log/audit-log.service";
 import type { AuthUserPayload } from "../auth/auth.service";
 import {
   canManageElevatedUsers,
@@ -26,6 +27,7 @@ export type UserResponse = {
   name: string | null;
   fullName: string | null;
   active: boolean;
+  companyId: string;
   roles: Role[];
   suiteNavGrants: string[] | null;
   /** null = sin límite mensual (UTC) para el asistente IA de suite. */
@@ -74,6 +76,7 @@ function toUserResponse(user: {
   name: string | null;
   fullName: string | null;
   active: boolean;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
   suiteNavGrants?: string | null;
@@ -87,6 +90,7 @@ function toUserResponse(user: {
     name: user.name,
     fullName: user.fullName ?? null,
     active: user.active,
+    companyId: user.companyId,
     roles: user.roles.map((ur) => ur.role),
     suiteNavGrants: parseGrantsColumn(user.suiteNavGrants),
     suiteAgentMonthlyTokenLimit:
@@ -101,7 +105,10 @@ function toUserResponse(user: {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditLogService,
+  ) {}
 
   async findAll(activeOnly: boolean) {
     const where = activeOnly === true ? { active: true } : {};
@@ -223,6 +230,14 @@ export class UsersService {
     if (dto.accessExpiresAt !== undefined) {
       expPayload.accessExpiresAt = parseAccessExpiresAtInput(dto.accessExpiresAt);
     }
+    const companyId = (dto.companyId ?? actor.companyId ?? "").trim();
+    if (!companyId) {
+      throw new BadRequestException("companyId es obligatorio");
+    }
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    if (!company) {
+      throw new BadRequestException("companyId inválido");
+    }
     const user = await this.prisma.user.create({
       data: {
         email,
@@ -230,6 +245,7 @@ export class UsersService {
         name: dto.name?.trim() || null,
         fullName: dto.fullName?.trim() || null,
         active: dto.active ?? true,
+        companyId,
         ...grantsPayload,
         ...limitPayload,
         ...expPayload,
@@ -264,6 +280,7 @@ export class UsersService {
       suiteNavGrants?: string | null;
       suiteAgentMonthlyTokenLimit?: number | null;
       accessExpiresAt?: Date | null;
+      companyId?: string;
     } = {};
     if (dto.name !== undefined) {
       scalarData.name = dto.name?.trim() || null;
@@ -285,6 +302,17 @@ export class UsersService {
     if (dto.accessExpiresAt !== undefined) {
       scalarData.accessExpiresAt = parseAccessExpiresAtInput(dto.accessExpiresAt);
     }
+    if (dto.companyId !== undefined) {
+      const companyId = String(dto.companyId ?? "").trim();
+      if (!companyId) {
+        throw new BadRequestException("companyId no puede ser vacío");
+      }
+      const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+      if (!company) {
+        throw new BadRequestException("companyId inválido");
+      }
+      scalarData.companyId = companyId;
+    }
     await this.prisma.$transaction(async (tx) => {
       if (Object.keys(scalarData).length > 0) {
         await tx.user.update({
@@ -301,7 +329,20 @@ export class UsersService {
         }
       }
     });
-    return this.findOne(id);
+    const after = await this.findOne(id);
+    await this.audit.write(actor, {
+      action: "UPDATE",
+      entityType: "User",
+      entityId: id,
+      entityCompanyId: after.companyId,
+      before: targetResponse,
+      after,
+      meta: {
+        changed: Object.keys(scalarData),
+        roleIds: dto.roleIds !== undefined ? dto.roleIds : undefined,
+      },
+    });
+    return after;
   }
 
   async resetPassword(id: string, newPassword: string, actor: AuthUserPayload) {

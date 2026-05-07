@@ -10,8 +10,9 @@ import { fetchUsers, type User } from "../../lib/api";
 
 export function UsuariosList() {
   const router = useRouter();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, impersonate } = useAuth();
   const canCreate = useCan("create", "users");
+  const canImpersonate = !!currentUser?.roles?.includes("ADMIN_DEV");
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,16 +166,30 @@ export function UsuariosList() {
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => e.stopPropagation()}
                     >
-                      {canEditRow ? (
-                        <Link
-                          href={`/usuarios/${u.id}/editar`}
-                          className="text-amber-600 hover:underline dark:text-amber-300"
-                        >
-                          Editar
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
-                      )}
+                      <div className="flex items-center justify-end gap-3">
+                        {canEditRow ? (
+                          <Link
+                            href={`/usuarios/${u.id}/editar`}
+                            className="text-amber-600 hover:underline dark:text-amber-300"
+                          >
+                            Editar
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
+                        )}
+                        {canImpersonate && currentUser?.id !== u.id ? (
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-violet-700 hover:underline dark:text-violet-300"
+                            onClick={async () => {
+                              if (!confirm(`¿Impersonar a ${u.email}?`)) return;
+                              await impersonate(u.id);
+                            }}
+                          >
+                            Login-as
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );

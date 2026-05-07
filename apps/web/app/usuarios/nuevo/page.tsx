@@ -19,6 +19,7 @@ export default function NuevoUsuarioPage() {
             name: data.name?.trim() || undefined,
             fullName: data.fullName?.trim() || undefined,
             roleIds: data.roleIds,
+            companyId: data.companyId,
             active: data.active ?? true,
             suiteNavGrants: data.suiteNavGrants,
             suiteAgentMonthlyTokenLimit: data.suiteAgentMonthlyTokenLimit,

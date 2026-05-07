@@ -40,17 +40,33 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, stopImpersonation } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const canUpdateApp = useCan("access", "users");
 
   return (
-    <header className="no-print sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white px-6 shadow-md dark:border-neutral-800 dark:bg-[var(--app-shell-bg)]">
-      <div>
+    <header className="no-print sticky top-0 z-30 border-b border-slate-200/80 bg-white shadow-md dark:border-neutral-800 dark:bg-[var(--app-shell-bg)]">
+      {user?.impersonatedBy ? (
+        <div className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          <div className="min-w-0">
+            Está en <span className="font-semibold">impersonación</span> (actor:{" "}
+            <span className="font-mono">{user.impersonatedBy.email}</span>).
+          </div>
+          <button
+            type="button"
+            onClick={() => void stopImpersonation()}
+            className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-900/30"
+          >
+            Salir de impersonación
+          </button>
+        </div>
+      ) : null}
+      <div className="flex h-16 items-center justify-between px-6">
+        <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-neutral-100">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-slate-500 dark:text-neutral-400">{subtitle}</p>}
-      </div>
-      <div className="flex items-center gap-3">
+        </div>
+        <div className="flex items-center gap-3">
         <ConnectivityLanControl />
         <button
           type="button"
@@ -89,6 +105,7 @@ export function Header({ title, subtitle }: HeaderProps) {
             </button>
           </>
         )}
+      </div>
       </div>
     </header>
   );
