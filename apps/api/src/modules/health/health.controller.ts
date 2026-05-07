@@ -14,10 +14,17 @@ export class HealthController {
   async ping() {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
+      const sd = process.env.STORAGE_DRIVER;
       return {
         ok: true,
         database: true,
         storage: this.objectStorage.describe(),
+        /** Diagnóstico sin exponer el valor (p. ej. Railway: variable no inyectada o nombre mal copiado). */
+        storageDriverEnv: {
+          defined: sd !== undefined && sd !== "",
+          length: sd?.length ?? 0,
+          firstCharCode: sd && sd.length > 0 ? sd.charCodeAt(0) : null,
+        },
         timestamp: new Date().toISOString(),
       };
     } catch (e) {

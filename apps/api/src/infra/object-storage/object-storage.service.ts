@@ -24,12 +24,20 @@ export type PutObjectResult = {
 export class ObjectStorageService {
   private readonly log = new Logger(ObjectStorageService.name);
 
-  private driver(): "local" | "supabase" {
-    let d = (process.env.STORAGE_DRIVER || "local").trim();
+  /** Lee `STORAGE_DRIVER` tolerando BOM, espacios invisibles y comillas del editor de env. */
+  private rawStorageDriver(): string {
+    let d = (process.env.STORAGE_DRIVER || "local")
+      .replace(/^\uFEFF/, "")
+      .replace(/[\u200B-\u200D\uFEFF\u2060]/g, "")
+      .trim();
     if ((d.startsWith('"') && d.endsWith('"')) || (d.startsWith("'") && d.endsWith("'"))) {
       d = d.slice(1, -1).trim();
     }
-    d = d.toLowerCase();
+    return d.toLowerCase();
+  }
+
+  private driver(): "local" | "supabase" {
+    const d = this.rawStorageDriver();
     return d === "supabase" ? "supabase" : "local";
   }
 

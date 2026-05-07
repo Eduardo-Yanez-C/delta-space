@@ -12,6 +12,8 @@ apps/desktop/embed-api.__stale__*
 .env
 .env.*
 !.env.example
+# Por si el patrón anterior solo aplica a la raíz: nunca empaquetar .env del API en la imagen.
+apps/api/.env
 *.md
 .cursor
 terminals
