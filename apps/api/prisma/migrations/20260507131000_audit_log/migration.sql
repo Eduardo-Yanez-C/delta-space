@@ -1,5 +1,6 @@
 -- Auditoría de acciones (admin y mutaciones críticas).
-CREATE TABLE "AuditLog" (
+-- Nota: esta migración debe tolerar ejecuciones parciales en despliegues fallidos (Railway).
+CREATE TABLE IF NOT EXISTS "AuditLog" (
   "id" TEXT NOT NULL,
   "companyId" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
@@ -15,17 +16,31 @@ CREATE TABLE "AuditLog" (
   CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "AuditLog_companyId_createdAt_idx" ON "AuditLog"("companyId", "createdAt");
-CREATE INDEX "AuditLog_userId_createdAt_idx" ON "AuditLog"("userId", "createdAt");
-CREATE INDEX "AuditLog_entityType_entityId_createdAt_idx" ON "AuditLog"("entityType", "entityId", "createdAt");
+CREATE INDEX IF NOT EXISTS "AuditLog_companyId_createdAt_idx" ON "AuditLog"("companyId", "createdAt");
+CREATE INDEX IF NOT EXISTS "AuditLog_userId_createdAt_idx" ON "AuditLog"("userId", "createdAt");
+CREATE INDEX IF NOT EXISTS "AuditLog_entityType_entityId_createdAt_idx" ON "AuditLog"("entityType", "entityId", "createdAt");
 
-ALTER TABLE "AuditLog"
-  ADD CONSTRAINT "AuditLog_companyId_fkey"
-  FOREIGN KEY ("companyId") REFERENCES "Company"("id")
-  ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'AuditLog_companyId_fkey'
+  ) THEN
+    ALTER TABLE "AuditLog"
+      ADD CONSTRAINT "AuditLog_companyId_fkey"
+      FOREIGN KEY ("companyId") REFERENCES "Company"("id")
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
 
-ALTER TABLE "AuditLog"
-  ADD CONSTRAINT "AuditLog_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "User"("id")
-  ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'AuditLog_userId_fkey'
+  ) THEN
+    ALTER TABLE "AuditLog"
+      ADD CONSTRAINT "AuditLog_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "User"("id")
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
 
