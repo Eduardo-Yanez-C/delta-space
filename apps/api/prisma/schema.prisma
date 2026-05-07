@@ -5,9 +5,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+/// `DATABASE_URL` = runtime (puede ser pooler Supabase). `DATABASE_DIRECT_URL` = migraciones (Postgres directo; ver scripts/prisma-migrate-deploy.mjs).
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_DIRECT_URL")
 }
 
 /// PV Quoting — Modelo consolidado: clientes, productos, proveedores, precios, cotizaciones.

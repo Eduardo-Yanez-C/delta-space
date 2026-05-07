@@ -61,11 +61,12 @@ Este documento resume el estado del monorepo, los cambios orientados a producci�
 - **Install:** `npm install` (desde raíz del repo con workspaces) **o** `npm ci` en CI.
 - **Build:** `npm run build` (genera cliente Prisma + compila TS).
 - **Start:** `npm run start:prod` (equivale a `node dist/main.js`). Definir `NODE_ENV=production`.
-- **Migraciones:** en release, `npx prisma migrate deploy` con `DATABASE_URL` de Supabase (o staging). El historial Postgres vive en `apps/api/prisma/migrations/`; el SQLite del portable en `apps/api/prisma/desktop/migrations/`.
+- **Migraciones:** `npm run prisma:deploy --workspace=api` (usa `DATABASE_DIRECT_URL` para conectar a Postgres **directo**). Si `DATABASE_URL` es el **Session pooler** de Supabase, sin `DATABASE_DIRECT_URL` el deploy falla con *max clients reached*; copie la URI **Direct** (host `db.*.supabase.co`, puerto 5432) desde Supabase → Database → Connection string. El historial Postgres vive en `apps/api/prisma/migrations/`; el SQLite del portable en `apps/api/prisma/desktop/migrations/`.
 
 ### Variables mínimas (producción)
 
 - `DATABASE_URL`
+- `DATABASE_DIRECT_URL` (Postgres **directo** para migraciones; con Supabase pooler en `DATABASE_URL` es obligatoria; en local puede igualar `DATABASE_URL`)
 - `JWT_SECRET`
 - `NODE_ENV=production`
 - `PORT` (opcional; muchos hosts lo inyectan)

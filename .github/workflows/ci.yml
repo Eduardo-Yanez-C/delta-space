@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ci_test?schema=public
+      DATABASE_DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/ci_test?schema=public
       JWT_SECRET: ci-jwt-secret-minimum-32-characters-long-ok
       WEB_ORIGIN: http://127.0.0.1:3000
       NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:4000/api

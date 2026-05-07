@@ -32,6 +32,17 @@ if (!db.startsWith("postgresql://") && !db.startsWith("postgres://")) {
   fail("DATABASE_URL debe ser postgresql:// o postgres:// para despliegue nube.");
 }
 
+const dbDirect = process.env.DATABASE_DIRECT_URL?.trim() || "";
+const looksLikePooler = /pooler\.supabase\.com/i.test(db) || /[?&]pgbouncer=true/i.test(db);
+if (strict && looksLikePooler && (!dbDirect || dbDirect === db)) {
+  fail(
+    "DATABASE_URL apunta al pooler de Supabase. Defina DATABASE_DIRECT_URL con la URI Direct (host db.*.supabase.co:5432) para migraciones y Prisma.",
+  );
+}
+if (strict && !dbDirect) {
+  fail("Defina DATABASE_DIRECT_URL (puede ser igual que DATABASE_URL si no usa pooler).");
+}
+
 const jwt = process.env.JWT_SECRET?.trim() || "";
 if (jwt.length < 32) {
   fail("JWT_SECRET debe tener al menos 32 caracteres en entorno release.");
