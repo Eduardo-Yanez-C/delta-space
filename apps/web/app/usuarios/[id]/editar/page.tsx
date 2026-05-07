@@ -12,6 +12,7 @@ import {
   updateUser,
   activateUser,
   deactivateUser,
+  resetUserPassword,
   type User,
 } from "../../../../lib/api";
 import { actorIsAdminDev, userHasElevatedRole } from "../../../../lib/role-utils";
@@ -68,6 +69,31 @@ export default function EditarUsuarioPage() {
     }
   };
 
+  const handleResetPassword = async () => {
+    setActionError(null);
+    const pwd1 = window.prompt(
+      "Nueva contraseña (mínimo 6 caracteres). Se guardará en el servidor y reemplazará la actual.",
+    );
+    if (pwd1 == null) return;
+    const pwd = pwd1.trim();
+    if (pwd.length < 6) {
+      setActionError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    const confirmPwd = window.prompt("Confirme la nueva contraseña.");
+    if (confirmPwd == null) return;
+    if (confirmPwd.trim() !== pwd) {
+      setActionError("Las contraseñas no coinciden.");
+      return;
+    }
+    try {
+      await resetUserPassword(id, pwd);
+      window.alert("Contraseña restablecida.");
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Error al restablecer contraseña");
+    }
+  };
+
   if (loading) {
     return (
       <div className="card flex items-center justify-center p-12">
@@ -121,6 +147,14 @@ export default function EditarUsuarioPage() {
           {!blockElevatedOthers && (
             <div className="flex flex-col items-end gap-1">
               <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  title="Restablecer contraseña del usuario"
+                >
+                  Restablecer contraseña
+                </button>
                 {editedUser.active ? (
                   canDeactivateUser ? (
                     <button

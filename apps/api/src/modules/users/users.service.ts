@@ -278,6 +278,36 @@ export class UsersService {
     return this.findOne(id);
   }
 
+  async resetPassword(id: string, newPassword: string, actor: AuthUserPayload) {
+    const pwd = (newPassword ?? "").trim();
+    if (!pwd) throw new BadRequestException("password es obligatorio");
+    if (pwd.length < 6) {
+      throw new BadRequestException("password debe tener al menos 6 caracteres");
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { roles: { include: { role: true } } },
+    });
+    if (!user) {
+      throw new NotFoundException(`Usuario con id ${id} no encontrado`);
+    }
+    const targetResponse = toUserResponse(user);
+    this.assertCanMutateUserRecord(actor, targetResponse);
+
+    // Seguridad: para evitar lockout, solo ADMIN_DEV puede resetear su propia contraseña desde aquí.
+    if (actor.id === id && !isAdminDev(actor.roles)) {
+      throw new ForbiddenException("Solo ADMIN_DEV puede restablecer su propia contraseña desde este panel.");
+    }
+
+    const hashedPassword = await bcrypt.hash(pwd, SALT_ROUNDS);
+    await this.prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+    return { ok: true };
+  }
+
   async activate(id: string, actor: AuthUserPayload) {
     const target = await this.findOne(id);
     this.assertCanMutateUserRecord(actor, target);

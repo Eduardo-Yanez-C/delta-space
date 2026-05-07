@@ -1159,6 +1159,19 @@ export async function deactivateUser(id: string): Promise<User> {
   return res.json();
 }
 
+export async function resetUserPassword(id: string, password: string): Promise<{ ok: true }> {
+  const res = await fetch(`${getApiBase()}/users/${id}/password`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(nestHttpErrorMessage(err, "Error al restablecer contraseña"));
+  }
+  return res.json();
+}
+
 // ——— Dashboard (D1) ———
 export type DashboardKpis = {
   quotesTotal: number;
