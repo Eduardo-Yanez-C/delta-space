@@ -87,7 +87,7 @@ function looksLikeSupabaseSessionPooler(url) {
   }
 }
 
-/** Modo Transaction (6543): malo para `migrate deploy` con Prisma en Supabase. */
+/** Modo Transaction (6543). Útil si Session pooler está saturado. */
 function looksLikeSupabaseTransactionPooler(url) {
   try {
     const normalized = url.replace(/^postgres:\/\//i, "http://").replace(/^postgresql:\/\//i, "http://");
@@ -98,14 +98,29 @@ function looksLikeSupabaseTransactionPooler(url) {
   }
 }
 
-if (looksLikeSupabaseTransactionPooler(databaseUrl) && directUrl === databaseUrl) {
-  console.error(
-    "[prisma-migrate-deploy] DATABASE_URL usa el pooler en modo Transaction (puerto 6543). Las migraciones Prisma no deben usar ese modo.",
+function hasQueryParam(raw, key) {
+  try {
+    const normalized = raw.replace(/^postgres:\/\//i, "http://").replace(/^postgresql:\/\//i, "http://");
+    const u = new URL(normalized);
+    return u.searchParams.has(key);
+  } catch {
+    return false;
+  }
+}
+
+if (looksLikeSupabaseTransactionPooler(directUrl)) {
+  if (!hasQueryParam(directUrl, "pgbouncer")) {
+    console.error(
+      "[prisma-migrate-deploy] DATABASE_DIRECT_URL apunta a pooler Transaction (6543) pero falta `pgbouncer=true`.",
+    );
+    console.error(
+      "  Para Prisma en poolers: agregue `?pgbouncer=true` (o `&pgbouncer=true`) para desactivar prepared statements.",
+    );
+    process.exit(1);
+  }
+  console.log(
+    "[prisma-migrate-deploy] Usando Transaction pooler (6543) para migraciones (pgbouncer=true).",
   );
-  console.error(
-    "  Use Session pooler (puerto 5432, host …pooler.supabase.com) o Postgres directo para DATABASE_DIRECT_URL.",
-  );
-  process.exit(1);
 }
 
 if (looksLikeSupabasePooler(databaseUrl) && directUrl === databaseUrl) {
