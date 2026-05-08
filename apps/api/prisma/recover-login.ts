@@ -74,6 +74,7 @@ async function main() {
   console.log("Antes:", before ? { exists: true, active: before.active, roles: before.roles.map((r) => r.role.name) } : { exists: false });
 
   const hashedPassword = await bcrypt.hash("admin123", 10);
+  const defaultCompanyId = "company_default";
   const admin = await prisma.user.upsert({
     where: { email },
     create: {
@@ -81,11 +82,13 @@ async function main() {
       password: hashedPassword,
       name: "Administrador",
       active: true,
+      companyId: defaultCompanyId,
     },
     update: {
       password: hashedPassword,
       name: "Administrador",
       active: true,
+      companyId: defaultCompanyId,
     },
   });
 

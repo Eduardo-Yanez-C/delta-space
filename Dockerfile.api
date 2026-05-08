@@ -1,7 +1,12 @@
 # Imagen solo para el workspace `api` (Railway: builder DOCKERFILE + dockerfilePath en apps/api/railway.json).
 # Nombre distinto de `Dockerfile` para no forzar build Docker en web/desktop del mismo repo.
 # Evita Railpack, que en algunos proyectos exige `secret JWT_SECRET` en la fase de build.
-FROM node:20-bookworm-slim
+#
+# Etapa final SIN ENV DATABASE_*: si dejáramos los placeholders en la imagen, a veces el runtime
+# (preDeploy / CMD) hereda 127.0.0.1:5432 aunque en el panel existan variables — Prisma intenta
+# conectar al "placeholder" y falla con P1001. Las URLs reales deben venir solo de Railway.
+
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
@@ -10,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 COPY package.json package-lock.json* ./
 COPY apps ./apps
 
-# Placeholders para `postinstall` → `prisma generate` y para el build. En runtime Railway inyecta los valores reales.
+# Solo build: valores ficticios para postinstall → prisma generate y tsc.
 ARG JWT_SECRET=dummy-build-only-min-32-chars-for-prisma-generate
 ENV JWT_SECRET=${JWT_SECRET}
 ARG DATABASE_URL=postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder?schema=public
@@ -24,10 +29,24 @@ COPY . .
 
 RUN npm run build --workspace=api
 
+# --- Imagen de ejecución: misma árbol de archivos, sin DATABASE_URL/DATABASE_DIRECT_URL en capas ---
+FROM node:20-bookworm-slim AS runner
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app /app
+
+# Ningún .env empaquetado debe pisar DATABASE_* que inyecta Railway (Prisma carga .env junto al proyecto API).
+RUN sh -c 'for f in /app/apps/api/.env /app/apps/api/.env.local /app/apps/api/.env.production /app/apps/api/.env.development /app/.env; do rm -f "$f"; done' \
+  && chmod +x /app/apps/api/scripts/docker-entrypoint.sh
+
 ENV NODE_ENV=production
-# Railway a veces no inyecta variables de servicio hasta redeploy; default para esta imagen (cloud + Supabase).
-# Si defines STORAGE_DRIVER en el panel de Railway, ese valor pisa este ENV en runtime.
+# Railway: si defines STORAGE_DRIVER en el panel, pisa este valor en runtime.
 ENV STORAGE_DRIVER=supabase
 EXPOSE 4000
 
-CMD ["npm", "run", "start", "--workspace=api"]
+WORKDIR /app
+# Sin ENTRYPOINT: si en Railway deja «Start command» vacío, se usa este CMD tal cual.
+CMD ["/bin/sh", "/app/apps/api/scripts/docker-entrypoint.sh"]

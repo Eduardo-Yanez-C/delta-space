@@ -1,9 +1,14 @@
 /**
  * Wrapper de `prisma migrate deploy` para Supabase + Railway.
  *
- * El pooler en modo "Session" limita conexiones (~15); las migraciones Prisma deben usar
- * la URI **Direct** (host db.*.supabase.co:5432) vía DATABASE_DIRECT_URL.
+ * Ideal: `DATABASE_DIRECT_URL` = Postgres **directo** (db.*.supabase.co:5432).
+ * Ojo: ese host suele ser **solo IPv6**. Plataformas solo-IPv4 (p. ej. muchos contenedores)
+ * dan Prisma P1001; Supabase recomienda **Supavisor modo Session** (pooler.*:5432, IPv4).
+ * En ese caso pon `DATABASE_DIRECT_URL` = misma URI que **Session pooler** que `DATABASE_URL`.
  *
+ * No uses modo **Transaction** (puerto 6543) para migraciones.
+ *
+ * @see https://supabase.com/docs/guides/database/connecting-to-postgres
  * @see https://www.prisma.io/docs/guides/database/supabase-creating-a-project#configure-the-postgresql-connection-url
  */
 import { spawnSync } from "node:child_process";
@@ -13,9 +18,42 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const apiRoot = path.resolve(__dirname, "..");
 
+function isObviousNonProductionDbUrl(url) {
+  if (!url) return false;
+  try {
+    const normalized = url.replace(/^postgres:\/\//i, "http://").replace(/^postgresql:\/\//i, "http://");
+    const u = new URL(normalized);
+    const db = (u.pathname || "").replace(/^\//, "").split("?")[0] || "";
+    if (u.hostname === "127.0.0.1" || u.hostname === "localhost") {
+      if (/placeholder/i.test(db) || u.username === "placeholder") return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 const databaseUrl = (process.env.DATABASE_URL || "").trim();
 if (!databaseUrl) {
   console.error("[prisma-migrate-deploy] Falta DATABASE_URL.");
+  console.error(
+    "  Railway → servicio **api** → Variables: defina DATABASE_URL (y DATABASE_DIRECT_URL si usa pooler Supabase).",
+  );
+  console.error(
+    "  Si la imagen anterior llevaba URL de ejemplo, redeploy tras definir variables; la imagen nueva no embebe DATABASE_URL.",
+  );
+  process.exit(1);
+}
+if (isObviousNonProductionDbUrl(databaseUrl)) {
+  console.error(
+    "[prisma-migrate-deploy] DATABASE_URL parece la URL ficticia del build (127.0.0.1 / placeholder), no la base real.",
+  );
+  console.error(
+    "  En Railway, abra el servicio **api** → Variables y añada DATABASE_URL (Postgres/Supabase). Guarde y vuelva a desplegar.",
+  );
+  console.error(
+    "  Con pooler de Supabase en DATABASE_URL, añada también DATABASE_DIRECT_URL (host db.*.supabase.co, puerto 5432).",
+  );
   process.exit(1);
 }
 
@@ -36,19 +74,101 @@ function looksLikeSupabasePooler(url) {
   }
 }
 
-if (looksLikeSupabasePooler(databaseUrl) && directUrl === databaseUrl) {
+/** Pooler Supavisor modo Session: IPv4 + puerto 5432 (recomendado si Direct da P1001 desde Railway). */
+function looksLikeSupabaseSessionPooler(url) {
+  try {
+    const normalized = url.replace(/^postgres:\/\//i, "http://").replace(/^postgresql:\/\//i, "http://");
+    const u = new URL(normalized);
+    if (!/pooler\.supabase\.com$/i.test(u.hostname)) return false;
+    const port = u.port || "5432";
+    return port === "5432";
+  } catch {
+    return false;
+  }
+}
+
+/** Modo Transaction (6543): malo para `migrate deploy` con Prisma en Supabase. */
+function looksLikeSupabaseTransactionPooler(url) {
+  try {
+    const normalized = url.replace(/^postgres:\/\//i, "http://").replace(/^postgresql:\/\//i, "http://");
+    const u = new URL(normalized);
+    return (u.port || "") === "6543";
+  } catch {
+    return false;
+  }
+}
+
+if (looksLikeSupabaseTransactionPooler(databaseUrl) && directUrl === databaseUrl) {
   console.error(
-    "[prisma-migrate-deploy] DATABASE_URL apunta al pooler de Supabase; `migrate deploy` no puede usar solo esa URI.",
+    "[prisma-migrate-deploy] DATABASE_URL usa el pooler en modo Transaction (puerto 6543). Las migraciones Prisma no deben usar ese modo.",
   );
   console.error(
-    "  1) Supabase → Project Settings → Database → Connection string → elija modo/host **Direct** (db.PROJECT.supabase.co:5432).",
-  );
-  console.error("  2) Railway (servicio api) → Variables → DATABASE_DIRECT_URL = esa URI (con sslmode=require si aplica).");
-  console.error(
-    "  3) Deje DATABASE_URL con Session pooler para la app si lo desea, o use Transaction pooler según su plan.",
+    "  Use Session pooler (puerto 5432, host …pooler.supabase.com) o Postgres directo para DATABASE_DIRECT_URL.",
   );
   process.exit(1);
 }
+
+if (looksLikeSupabasePooler(databaseUrl) && directUrl === databaseUrl) {
+  if (looksLikeSupabaseSessionPooler(databaseUrl)) {
+    console.log(
+      "[prisma-migrate-deploy] Session pooler (IPv4) para URL y migraciones — adecuado si Direct (IPv6) falla con P1001 en Railway.",
+    );
+  } else {
+    console.error(
+      "[prisma-migrate-deploy] DATABASE_URL es pooler pero no parece modo Session (5432). Defina DATABASE_DIRECT_URL explícita.",
+    );
+    console.error(
+      "  • Si Railway da P1001 con db.PROJECT.supabase.co: use **Session pooler** para DATABASE_URL y la **misma** cadena en DATABASE_DIRECT_URL.",
+    );
+    console.error(
+      "  • Si puede usar IPv6: Direct db.PROJECT.supabase.co:5432 solo en DATABASE_DIRECT_URL.",
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * Prisma P1013 «invalid port» suele venir de URLs mal formadas: contraseña con @ # : / ? sin %XX.
+ * Validamos antes de llamar a prisma para dar un mensaje útil.
+ */
+function validatePostgresUri(label, raw) {
+  const s = raw.trim();
+  if (!/^postgres(ql)?:\/\//i.test(s)) {
+    console.error(`[prisma-migrate-deploy] ${label} debe empezar por postgresql:// o postgres://`);
+    process.exit(1);
+  }
+  const normalized = s.replace(/^postgres:\/\//i, "http://").replace(/^postgresql:\/\//i, "http://");
+  let u;
+  try {
+    u = new URL(normalized);
+  } catch (e) {
+    console.error(`[prisma-migrate-deploy] ${label} no es una URL válida (${e instanceof Error ? e.message : e}).`);
+    console.error(
+      "  Revise comillas, espacios al inicio/fin y que la contraseña use codificación URL si tiene @ # : / ?",
+    );
+    process.exit(1);
+  }
+  if (u.port && !/^\d{1,5}$/.test(u.port)) {
+    console.error(
+      `[prisma-migrate-deploy] ${label}: el parser interpretó el puerto como "${u.port}" (inválido).`,
+    );
+    console.error(
+      "  Causa habitual: la contraseña de Postgres contiene @ u otros caracteres especiales sin codificar.",
+    );
+    console.error(
+      "  Solución: en Supabase use «Copy» en la connection string completa, o codifique la contraseña (ej. @ → %40).",
+    );
+    console.error("  Ver: https://www.prisma.io/docs/orm/reference/connection-urls#special-characters");
+    process.exit(1);
+  }
+  if (u.port && (Number(u.port) < 1 || Number(u.port) > 65535)) {
+    console.error(`[prisma-migrate-deploy] ${label}: puerto fuera de rango (${u.port}).`);
+    process.exit(1);
+  }
+}
+
+validatePostgresUri("DATABASE_URL", databaseUrl);
+validatePostgresUri("DATABASE_DIRECT_URL", directUrl);
 
 const r = spawnSync("npx", ["prisma", "migrate", "deploy"], {
   stdio: "inherit",

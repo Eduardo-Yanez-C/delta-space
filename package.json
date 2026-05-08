@@ -23,6 +23,9 @@
     "prisma:migrate": "npm --workspace api run prisma:migrate",
     "prisma:generate": "npm --workspace api run prisma:generate",
     "verify:lan-directory": "node scripts/collect-lan-directory-evidence.mjs",
+    "railway:push-db-env": "node scripts/railway-push-db-env.mjs",
+    "railway:db-direct-url": "node scripts/build-supabase-direct-url.mjs",
+    "railway:db-direct-url:ps": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-supabase-direct-url.ps1",
     "build:lan-p2p": "cargo build --release --manifest-path apps/lan-p2p/Cargo.toml"
   },
   "devDependencies": {

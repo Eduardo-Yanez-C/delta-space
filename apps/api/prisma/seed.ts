@@ -67,6 +67,7 @@ async function seedRolesAndAdmin() {
 
   const hashedPassword = await bcrypt.hash("admin123", 10);
   const adminEmail = "eduardo.yanez.concha@gmail.com";
+  const defaultCompanyId = "company_default";
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail.toLowerCase() },
@@ -75,11 +76,13 @@ async function seedRolesAndAdmin() {
       password: hashedPassword,
       name: "Administrador",
       active: true,
+      companyId: defaultCompanyId,
     },
     update: {
       password: hashedPassword,
       name: "Administrador",
       active: true,
+      companyId: defaultCompanyId,
     },
   });
 
@@ -121,9 +124,11 @@ export async function seedClientsOptional() {
     console.log("  Clientes: ya existentes, no se modifican.");
     return;
   }
+  const demoCompanyId = "company_default";
   await prisma.client.createMany({
     data: [
       {
+        companyId: demoCompanyId,
         type: "RESIDENCIAL",
         name: "Casa Solar García",
         taxId: null,
@@ -133,6 +138,7 @@ export async function seedClientsOptional() {
         notes: "Cliente residencial, interés en sistema 5 kW.",
       },
       {
+        companyId: demoCompanyId,
         type: "COMERCIAL",
         name: "Comercializadora del Norte SpA",
         taxId: "76.123.456-7",
@@ -142,6 +148,7 @@ export async function seedClientsOptional() {
         notes: "Cotización para cubierta 100 kW.",
       },
       {
+        companyId: demoCompanyId,
         type: "INDUSTRIAL",
         name: "Planta Industrial del Pacífico",
         taxId: "78.456.789-2",

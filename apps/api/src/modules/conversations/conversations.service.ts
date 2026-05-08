@@ -1903,8 +1903,14 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
   private async findDuplicateCandidates(
     entityType: string,
     snapshot: Record<string, unknown>,
+    /** Si se informa, limita clientes / estudios / cotizaciones a la empresa del receptor (multi-tenant). */
+    tenantCompanyId?: string | null,
   ): Promise<Array<{ id: string; label: string }>> {
     const safe = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+    const companyScope =
+      typeof tenantCompanyId === "string" && tenantCompanyId.trim() !== ""
+        ? { companyId: tenantCompanyId.trim() }
+        : {};
     if (entityType === "PRODUCT") {
       const q = safe(snapshot.name);
       if (!q) return [];
@@ -1929,7 +1935,7 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
       const q = safe(snapshot.name);
       if (!q) return [];
       const rows = await this.prisma.client.findMany({
-        where: { name: { contains: q } },
+        where: { ...companyScope, name: { contains: q } },
         select: { id: true, name: true },
         take: 8,
       });
@@ -1939,7 +1945,7 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
       const q = safe(snapshot.title);
       if (!q) return [];
       const rows = await this.prisma.fvStudy.findMany({
-        where: { title: { contains: q } },
+        where: { ...companyScope, title: { contains: q } },
         select: { id: true, title: true },
         take: 8,
       });
@@ -1949,7 +1955,7 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
       const q = safe(snapshot.title);
       if (!q) return [];
       const rows = await this.prisma.quote.findMany({
-        where: { title: { contains: q } },
+        where: { ...companyScope, title: { contains: q } },
         select: { id: true, title: true, commercialNumber: true },
         take: 8,
       });
@@ -2013,11 +2019,27 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
       });
       return { ok: true, status: "REJECTED" };
     }
+    const receiver = await this.prisma.user.findUnique({
+      where: { id: receiverUserId },
+      select: { companyId: true },
+    });
+    const receiverCompanyId = receiver?.companyId?.trim() || null;
+    const entityTypeRequiresTenant =
+      msg.sharedEntity.entityType === "CLIENT" ||
+      msg.sharedEntity.entityType === "FV_STUDY" ||
+      msg.sharedEntity.entityType === "QUOTE";
+    if (entityTypeRequiresTenant && !receiverCompanyId) {
+      throw new BadRequestException("Usuario receptor sin empresa asignada.");
+    }
     if (
       (dto.decision === "ACCEPT_USE_EXISTING" || dto.decision === "ACCEPT_LINK_EXISTING") &&
       !dto.existingEntityId?.trim()
     ) {
-      const candidates = await this.findDuplicateCandidates(msg.sharedEntity.entityType, snapshot);
+      const candidates = await this.findDuplicateCandidates(
+        msg.sharedEntity.entityType,
+        snapshot,
+        receiverCompanyId,
+      );
       throw new BadRequestException({
         message: "Debe seleccionar una entidad existente para esa opción.",
         mode: "MANUAL_RESOLUTION_REQUIRED",
@@ -2062,7 +2084,7 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
         } else if (msg.sharedEntity.entityType === "CLIENT") {
           const created = await this.prisma.client.create({
             data: {
-              companyId: "company_default",
+              companyId: receiverCompanyId!,
               type: String(proposedImport.type ?? "EMPRESA"),
               name: String(proposedImport.name ?? snapshot.name ?? "Cliente compartido"),
               email: proposedImport.email != null ? String(proposedImport.email) : null,
@@ -2083,7 +2105,40 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
           );
         }
       } else {
-        targetEntityId = dto.existingEntityId!.trim();
+        const existingId = dto.existingEntityId!.trim();
+        const et = msg.sharedEntity.entityType;
+        if (et === "CLIENT") {
+          const row = await this.prisma.client.findUnique({
+            where: { id: existingId },
+            select: { companyId: true },
+          });
+          if (!row || row.companyId !== receiverCompanyId) {
+            throw new BadRequestException(
+              "La entidad seleccionada no existe o no pertenece a su empresa.",
+            );
+          }
+        } else if (et === "FV_STUDY") {
+          const row = await this.prisma.fvStudy.findUnique({
+            where: { id: existingId },
+            select: { companyId: true },
+          });
+          if (!row || row.companyId !== receiverCompanyId) {
+            throw new BadRequestException(
+              "La entidad seleccionada no existe o no pertenece a su empresa.",
+            );
+          }
+        } else if (et === "QUOTE") {
+          const row = await this.prisma.quote.findUnique({
+            where: { id: existingId },
+            select: { companyId: true },
+          });
+          if (!row || row.companyId !== receiverCompanyId) {
+            throw new BadRequestException(
+              "La entidad seleccionada no existe o no pertenece a su empresa.",
+            );
+          }
+        }
+        targetEntityId = existingId;
       }
 
       await this.prisma.sharedEntityImportDecision.update({
@@ -2132,7 +2187,23 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
     } catch {
       snapshot = {};
     }
-    const candidates = await this.findDuplicateCandidates(msg.sharedEntity.entityType, snapshot);
+    const receiver = await this.prisma.user.findUnique({
+      where: { id: receiverUserId },
+      select: { companyId: true },
+    });
+    const receiverCompanyId = receiver?.companyId?.trim() || null;
+    const entityTypeRequiresTenant =
+      msg.sharedEntity.entityType === "CLIENT" ||
+      msg.sharedEntity.entityType === "FV_STUDY" ||
+      msg.sharedEntity.entityType === "QUOTE";
+    if (entityTypeRequiresTenant && !receiverCompanyId) {
+      throw new BadRequestException("Usuario sin empresa asignada.");
+    }
+    const candidates = await this.findDuplicateCandidates(
+      msg.sharedEntity.entityType,
+      snapshot,
+      receiverCompanyId,
+    );
     return {
       messageId,
       entityType: msg.sharedEntity.entityType,
