@@ -6,7 +6,8 @@
  * dan Prisma P1001; Supabase recomienda **Supavisor modo Session** (pooler.*:5432, IPv4).
  * En ese caso pon `DATABASE_DIRECT_URL` = misma URI que **Session pooler** que `DATABASE_URL`.
  *
- * No uses modo **Transaction** (puerto 6543) para migraciones.
+ * Modo **Transaction** (6543) con `pgbouncer=true` es válido si Session agota conexiones;
+ * puede usar la **misma** URL en `DATABASE_URL` y `DATABASE_DIRECT_URL`.
  *
  * @see https://supabase.com/docs/guides/database/connecting-to-postgres
  * @see https://www.prisma.io/docs/guides/database/supabase-creating-a-project#configure-the-postgresql-connection-url
@@ -128,15 +129,25 @@ if (looksLikeSupabasePooler(databaseUrl) && directUrl === databaseUrl) {
     console.log(
       "[prisma-migrate-deploy] Session pooler (IPv4) para URL y migraciones — adecuado si Direct (IPv6) falla con P1001 en Railway.",
     );
+  } else if (
+    looksLikeSupabaseTransactionPooler(databaseUrl) &&
+    hasQueryParam(databaseUrl, "pgbouncer")
+  ) {
+    console.log(
+      "[prisma-migrate-deploy] Transaction pooler (6543) con pgbouncer=true para URL y migraciones — evita límite de sesión (pool_size) en 5432.",
+    );
   } else {
     console.error(
-      "[prisma-migrate-deploy] DATABASE_URL es pooler pero no parece modo Session (5432). Defina DATABASE_DIRECT_URL explícita.",
+      "[prisma-migrate-deploy] DATABASE_URL es pooler Supabase pero no es Session (5432) ni Transaction (6543) con pgbouncer=true.",
     );
     console.error(
-      "  • Si Railway da P1001 con db.PROJECT.supabase.co: use **Session pooler** para DATABASE_URL y la **misma** cadena en DATABASE_DIRECT_URL.",
+      "  • Session: misma cadena en DATABASE_URL y DATABASE_DIRECT_URL (host …pooler.supabase.com:5432).",
     );
     console.error(
-      "  • Si puede usar IPv6: Direct db.PROJECT.supabase.co:5432 solo en DATABASE_DIRECT_URL.",
+      "  • Transaction: …:6543 con `pgbouncer=true` en la misma cadena para ambas variables si coinciden.",
+    );
+    console.error(
+      "  • Direct IPv6: solo en DATABASE_DIRECT_URL si su red soporta IPv6.",
     );
     process.exit(1);
   }
