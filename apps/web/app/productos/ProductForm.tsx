@@ -323,21 +323,32 @@ const initial = isEdit
         </div>
       </div>
 
-      <div>
+      <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-600 dark:bg-slate-800/40">
         <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Categoría *</label>
+        <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+          Elija el tipo de producto. Marca y modelo van en el bloque siguiente.
+        </p>
         <select
           value={form.categoryId}
           onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
           className="input-field"
           required
         >
-<option value="">Seleccione categoría</option>
-            {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+          <option value="" disabled hidden>
+            Seleccione categoría
+          </option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
           ))}
         </select>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+
+      <div className="space-y-3 border-t border-slate-200 pt-5 dark:border-slate-600">
+        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Marca y modelo</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Opcional. “Ninguna” / “Ninguno” dejan el campo vacío.</p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Marca</label>
           <select
@@ -396,6 +407,7 @@ const initial = isEdit
               )}
             </>
           )}
+        </div>
         </div>
       </div>
 
