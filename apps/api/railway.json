@@ -15,6 +15,6 @@
   "deploy": {
     "startCommand": null,
     "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 120
+    "healthcheckTimeout": 180
   }
 }

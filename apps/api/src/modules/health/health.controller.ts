@@ -9,17 +9,34 @@ export class HealthController {
     private readonly objectStorage: ObjectStorageService,
   ) {}
 
-  /** GET /api/health — listo para probes en Railway/Render. */
+  /**
+   * GET /api/health — **liveness** (Railway/Render/K8s): 200 si el proceso Nest responde.
+   * No toca Postgres: un pooler saturado o un fallo transitorio de DB no debe tumbar el deploy
+   * ni marcar el contenedor como no saludable mientras la API está arriba.
+   */
   @Get()
-  async ping() {
+  live() {
+    return {
+      ok: true,
+      probe: "liveness",
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * GET /api/health/ready — **readiness**: DB + storage. 503 si la base no responde.
+   * Usar para comprobaciones manuales o monitores que sí deban alertar por dependencias.
+   */
+  @Get("ready")
+  async ready() {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       const sd = process.env.STORAGE_DRIVER;
       return {
         ok: true,
+        probe: "readiness",
         database: true,
         storage: this.objectStorage.describe(),
-        /** Diagnóstico sin exponer el valor (p. ej. Railway: variable no inyectada o nombre mal copiado). */
         storageDriverEnv: {
           defined: sd !== undefined && sd !== "",
           length: sd?.length ?? 0,

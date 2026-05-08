@@ -71,8 +71,10 @@ async function bootstrap() {
     },
     credentials: true,
   });
-  const port = process.env.PORT || 4000;
-  await app.listen(port);
+  const envPort = process.env.PORT;
+  const parsed = envPort ? Number(envPort) : NaN;
+  const port = Number.isFinite(parsed) && parsed > 0 ? parsed : 4000;
+  await app.listen(port, "0.0.0.0");
   try {
     const adapter = app.getHttpAdapter();
     const instance = adapter.getInstance();
