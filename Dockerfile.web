@@ -1,0 +1,50 @@
+# Imagen solo para el workspace `web` (Next.js). Railway: servicio separado del `api`,
+# con `dockerfilePath` en `apps/web/railway.json` y variables de build para NEXT_PUBLIC_*.
+#
+# Requiere en Railway (servicio web): NEXT_PUBLIC_API_BASE_URL=https://…/api (misma variable en build + runtime).
+
+FROM node:20-bookworm-slim AS builder
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json* ./
+COPY apps ./apps
+
+# postinstall del workspace `api` (prisma generate) durante `npm ci`
+ARG JWT_SECRET=dummy-build-only-min-32-chars-for-prisma-generate
+ENV JWT_SECRET=${JWT_SECRET}
+ARG DATABASE_URL=postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder?schema=public
+ENV DATABASE_URL=${DATABASE_URL}
+ARG DATABASE_DIRECT_URL=postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder?schema=public
+ENV DATABASE_DIRECT_URL=${DATABASE_DIRECT_URL}
+
+# Obligatorio en build: verify-release-env (prebuild de Next). Railway inyecta desde el panel.
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+
+RUN npm ci
+
+COPY . .
+
+RUN npm run build --workspace=web
+
+FROM node:20-bookworm-slim AS runner
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app /app
+
+RUN sh -c 'for f in /app/apps/web/.env /app/apps/web/.env.local /app/apps/web/.env.production /app/.env; do rm -f "$f"; done'
+
+ENV NODE_ENV=production
+ENV PORT=3000
+EXPOSE 3000
+
+WORKDIR /app
+CMD ["npm", "run", "start", "--workspace=web"]
