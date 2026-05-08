@@ -1,0 +1,49 @@
+# Despliega el servicio Next (web) en Railway desde GitHub Actions.
+#
+# Requisito único (no evitable por seguridad de las plataformas): en el repo GitHub
+# → Settings → Secrets and variables → Actions → New repository secret:
+#   RAILWAY_TOKEN = token de proyecto (Railway → proyecto → Settings → Tokens → "Project Token").
+# Opcional: RAILWAY_WEB_SERVICE_NAME = nombre exacto del servicio en Railway (default: web).
+#
+# Si ya tenés Railway conectado a GitHub para el mismo servicio, podés duplicar builds:
+# en ese caso definí la variable de repositorio SKIP_RAILWAY_CLI_DEPLOY = true para omitir este workflow.
+# https://docs.railway.com/develop/cli
+
+name: Railway web deploy
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "apps/web/**"
+      - "Dockerfile.web"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+concurrency:
+  group: railway-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  railway-up:
+    if: ${{ vars.SKIP_RAILWAY_CLI_DEPLOY != 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: railway up (servicio web)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_WEB_SERVICE_NAME: ${{ secrets.RAILWAY_WEB_SERVICE_NAME }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RAILWAY_TOKEN}" ]; then
+            echo "::notice title=Railway::Sin RAILWAY_TOKEN en GitHub Secrets: no se ejecuta railway up. El deploy del front sigue siendo el de Railway/Vercel que ya tengas conectado al repo."
+            exit 0
+          fi
+          SVC="${RAILWAY_WEB_SERVICE_NAME:-web}"
+          echo "Desplegando servicio Railway: ${SVC}"
+          npm_config_yes=true npx --yes @railway/cli@4.57.0 railway up --ci --service "${SVC}"
