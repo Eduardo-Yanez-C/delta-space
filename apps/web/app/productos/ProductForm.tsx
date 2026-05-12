@@ -109,12 +109,17 @@ const initial = isEdit
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Carga inicial GET /categories, /brands, /suppliers (independiente del error al guardar). */
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   /** Última marca elegida; evita aplicar respuestas viejas de /product-models al cambiar de marca rápido. */
   const brandIdLatestRef = useRef(form.brandId);
   brandIdLatestRef.current = form.brandId;
 
   useEffect(() => {
+    setCatalogLoading(true);
+    setCatalogError(null);
     Promise.all([fetchCategories(), fetchBrands(), fetchSuppliers()])
       .then(([c, b, s]) => {
         setCategories(c);
@@ -123,7 +128,10 @@ const initial = isEdit
       })
       .catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : "Error al cargar catálogo";
-        setError(msg);
+        setCatalogError(msg);
+      })
+      .finally(() => {
+        setCatalogLoading(false);
       });
   }, []);
 
@@ -296,6 +304,17 @@ const initial = isEdit
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
+      {catalogError && (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+          role="status"
+        >
+          <strong className="font-medium">No se pudo cargar el catálogo.</strong> {catalogError}
+          <span className="mt-1 block text-xs opacity-90">
+            Si el resto de la app funciona pero esto falla, revise CORS (<code className="rounded bg-black/10 px-1">WEB_ORIGIN</code> en el API) y que la URL del API en el build del front sea la correcta.
+          </span>
+        </div>
+      )}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200" role="alert">
           {error}
@@ -328,11 +347,23 @@ const initial = isEdit
         <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
           Elija el tipo de producto. Marca y modelo van en el bloque siguiente.
         </p>
+        {catalogLoading && (
+          <p className="mb-2 text-sm text-slate-600 dark:text-slate-300" aria-live="polite">
+            Cargando categorías…
+          </p>
+        )}
+        {!catalogLoading && !catalogError && categories.length === 0 && (
+          <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-100">
+            No hay categorías en la base de datos. Hace falta al menos una categoría de producto para crear ítems; un
+            administrador puede cargarlas por API o con el seed de catálogo.
+          </p>
+        )}
         <select
           value={form.categoryId}
           onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
           className="input-field"
           required
+          disabled={catalogLoading || !!catalogError || categories.length === 0}
         >
           <option value="" disabled hidden>
             Seleccione categoría

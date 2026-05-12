@@ -86,6 +86,17 @@ Variable crítica:
 
 - `NEXT_PUBLIC_API_BASE_URL=https://tu-api.up.railway.app/api` (ejemplo)
 
+### Railway y commits «SKIPPED» en el servicio **api**
+
+En este monorepo el servicio **api** en Railway usa `apps/api/railway.json` con **watch paths** solo bajo `apps/api/**`, `Dockerfile.api`, etc. Los commits que solo cambian **`apps/web/**`** (formularios, UI, Next) **no tocan esos paths**: Railway muestra **SKIPPED** y el mensaje *No changes to watched files*. **Eso es correcto** y no indica un fallo del API.
+
+Para que los cambios de la **web** lleguen a producción hace falta **otro canal de deploy** del front:
+
+1. **Vercel** (recomendado si ya lo usás): proyecto con *Root Directory* `apps/web` y variable `NEXT_PUBLIC_API_BASE_URL` apuntando al API de Railway.
+2. **Segundo servicio en Railway** «web»: mismo repo, configuración `apps/web/railway.json` y `Dockerfile.web` (ya en el repo). Opcional: GitHub Action `.github/workflows/railway-web-deploy.yml` con secret `RAILWAY_TOKEN` para `railway up` al pushear web.
+
+Si solo mirás despliegues del servicio **api**, nunca verás actividad por commits de front: abrís el servicio **web** o Vercel.
+
 ---
 
 ## 5. Prisma + Supabase PostgreSQL
