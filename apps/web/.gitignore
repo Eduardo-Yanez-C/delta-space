@@ -6,3 +6,5 @@
 
 # E2E local (credenciales)
 .env.e2e.local
+
+.vercel

@@ -8,6 +8,16 @@ import { AuditLogService } from "../audit-log/audit-log.service";
 const LICENSE_EXPIRED_MESSAGE =
   "Su licencia de acceso ha finalizado. Contacte al administrador para renovarla.";
 
+/** Evita TypeError si hay filas `UserRole` huérfanas (rol borrado o FK rota). */
+function roleNamesFromInclude(roles: { role: { name: string } | null }[] | undefined): string[] {
+  if (!roles?.length) return [];
+  const out: string[] = [];
+  for (const ur of roles) {
+    if (ur.role) out.push(ur.role.name);
+  }
+  return out;
+}
+
 export function isUserAccessExpired(accessExpiresAt: Date | null | undefined): boolean {
   if (accessExpiresAt == null) return false;
   return Date.now() > new Date(accessExpiresAt).getTime();
@@ -66,7 +76,7 @@ export class AuthService {
       fullName: user.fullName ?? null,
       active: user.active,
       companyId: user.companyId,
-      roles: user.roles.map((ur) => ur.role.name),
+      roles: roleNamesFromInclude(user.roles),
       suiteNavGrants: (() => {
         const raw = (user as { suiteNavGrants?: string | null }).suiteNavGrants;
         if (raw == null || raw === "") return null;
@@ -102,7 +112,7 @@ export class AuthService {
       fullName: user.fullName ?? null,
       active: user.active,
       companyId: user.companyId,
-      roles: user.roles.map((ur) => ur.role.name),
+      roles: roleNamesFromInclude(user.roles),
       suiteNavGrants: (() => {
         const raw = (user as { suiteNavGrants?: string | null }).suiteNavGrants;
         if (raw == null || raw === "") return null;
@@ -145,7 +155,7 @@ export class AuthService {
       fullName: user.fullName ?? null,
       active: user.active,
       companyId: user.companyId,
-      roles: user.roles.map((ur) => ur.role.name),
+      roles: roleNamesFromInclude(user.roles),
       suiteNavGrants: (() => {
         const raw = (user as { suiteNavGrants?: string | null }).suiteNavGrants;
         if (raw == null || raw === "") return null;

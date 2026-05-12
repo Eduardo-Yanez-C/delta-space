@@ -17,7 +17,7 @@ import {
 } from "../auth/role-constants";
 import type { CreateUserDto } from "./dto/create-user.dto";
 import type { UpdateUserDto } from "./dto/update-user.dto";
-import type { Role } from "@prisma/client";
+import { Prisma, type Role } from "@prisma/client";
 import { normalizeSuiteNavGrantsInput, parseStoredSuiteNavGrants } from "../../common/suite-nav-grants";
 
 const SALT_ROUNDS = 10;
@@ -54,6 +54,13 @@ function parseSuiteAgentMonthlyTokenLimit(raw: unknown): number | null {
   const n = typeof raw === "number" ? raw : Number(raw);
   if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
     throw new BadRequestException("suiteAgentMonthlyTokenLimit debe ser null o un entero >= 0");
+  }
+  /** Columna Prisma `Int` = PostgreSQL INTEGER (signed 32 bits). */
+  const PG_INT_MAX = 2_147_483_647;
+  if (n > PG_INT_MAX) {
+    throw new BadRequestException(
+      `suiteAgentMonthlyTokenLimit no puede superar ${PG_INT_MAX} (límite de base de datos).`,
+    );
   }
   return n;
 }
@@ -114,8 +121,8 @@ function toUserResponse(user: {
 }
 
 /** Enteros de rol positivos, sin duplicados (evita P2002 en UserRole al guardar). */
-function sanitizeRoleIds(raw: number[] | undefined): number[] {
-  if (!raw?.length) return [];
+function sanitizeRoleIds(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
   const seen = new Set<number>();
   const out: number[] = [];
   for (const v of raw) {
@@ -224,7 +231,7 @@ export class UsersService {
     }
   }
 
-  async validateRoleIds(roleIds: number[]) {
+  async validateRoleIds(roleIds: unknown) {
     const clean = sanitizeRoleIds(roleIds);
     if (clean.length === 0) {
       return;
@@ -301,7 +308,6 @@ export class UsersService {
     if (roleIds.length > 0) {
       await this.prisma.userRole.createMany({
         data: roleIds.map((roleId) => ({ userId: user.id, roleId })),
-        skipDuplicates: true,
       });
     }
     return this.findOne(user.id);
@@ -363,23 +369,41 @@ export class UsersService {
       }
       scalarData.companyId = companyId;
     }
-    await this.prisma.$transaction(async (tx) => {
-      if (Object.keys(scalarData).length > 0) {
-        await tx.user.update({
-          where: { id },
-          data: scalarData,
-        });
+    try {
+      // Prisma interactive tx default timeout is 5000 ms; Supabase/Railway latency often exceeds that here → 500.
+      await this.prisma.$transaction(
+        async (tx) => {
+          if (Object.keys(scalarData).length > 0) {
+            await tx.user.update({
+              where: { id },
+              data: scalarData,
+            });
+          }
+          if (sanitizedRoleIds !== undefined) {
+            await tx.userRole.deleteMany({ where: { userId: id } });
+            if (sanitizedRoleIds.length > 0) {
+              await tx.userRole.createMany({
+                data: sanitizedRoleIds.map((roleId) => ({ userId: id, roleId })),
+              });
+            }
+          }
+        },
+        { maxWait: 15_000, timeout: 30_000 },
+      );
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        this.logger.error(`[update user ${id}] Prisma ${e.code}: ${e.message}`, e.stack);
+        throw new BadRequestException(
+          `No se pudo guardar el usuario (${e.code}). ${e.message}`,
+        );
       }
-      if (sanitizedRoleIds !== undefined) {
-        await tx.userRole.deleteMany({ where: { userId: id } });
-        if (sanitizedRoleIds.length > 0) {
-          await tx.userRole.createMany({
-            data: sanitizedRoleIds.map((roleId) => ({ userId: id, roleId })),
-            skipDuplicates: true,
-          });
-        }
+      if (e instanceof Prisma.PrismaClientValidationError) {
+        this.logger.error(`[update user ${id}] Prisma validation: ${e.message}`, e.stack);
+        throw new BadRequestException(`Datos inválidos para la base de datos: ${e.message}`);
       }
-    });
+      this.logger.error(`[update user ${id}] error inesperado`, e instanceof Error ? e.stack : e);
+      throw e;
+    }
     const after = await this.findOne(id);
     try {
       await this.audit.write(actor, {

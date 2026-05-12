@@ -50,6 +50,16 @@ async function bootstrap() {
 
   const allowedSet = new Set(originList);
 
+  if (
+    isProduction &&
+    webOrigins.length === 0 &&
+    legacyCors.length === 0
+  ) {
+    console.warn(
+      "[CORS] WEB_ORIGIN y CORS_ORIGIN están vacíos en producción. El front en Vercel no podrá llamar al API (navegador bloqueará la respuesta). Defina WEB_ORIGIN con la URL exacta del sitio, p. ej. https://tu-app.vercel.app (coma para varias URLs / previews).",
+    );
+  }
+
   /** En desarrollo, cualquier puerto en loopback (p. ej. Next en :3001) para no romper CORS al cambiar de puerto. */
   function isDevLoopbackOrigin(origin: string): boolean {
     try {

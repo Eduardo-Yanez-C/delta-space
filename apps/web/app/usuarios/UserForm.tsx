@@ -106,15 +106,20 @@ export function UserForm(props: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchRoles()
-      .then(setRoles)
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar roles"));
-  }, []);
-
-  useEffect(() => {
-    fetchCompanies()
-      .then(setCompanies)
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar empresas"));
+    let cancelled = false;
+    void (async () => {
+      const results = await Promise.allSettled([fetchRoles(), fetchCompanies()]);
+      if (cancelled) return;
+      const msgs: string[] = [];
+      if (results[0].status === "fulfilled") setRoles(results[0].value);
+      else msgs.push(results[0].reason instanceof Error ? results[0].reason.message : "Error al cargar roles");
+      if (results[1].status === "fulfilled") setCompanies(results[1].value);
+      else msgs.push(results[1].reason instanceof Error ? results[1].reason.message : "Error al cargar empresas");
+      if (msgs.length > 0) setError(msgs.join(" · "));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

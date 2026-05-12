@@ -21,6 +21,62 @@ import { UpdateUserDto } from "./dto/update-user.dto";
 import { UsersService } from "./users.service";
 import { OPERATIONAL_WRITE_ROLES } from "../auth/role-constants";
 
+/** Nest puede entregar el DTO sin todas las claves; se rellena desde `req.body` parseado. */
+function mergeUpdateUserDtoFromBody(dto: UpdateUserDto, body: Record<string, unknown>) {
+  if (Object.prototype.hasOwnProperty.call(body, "name")) {
+    const v = body.name;
+    if (v === null || v === undefined) {
+      dto.name = null;
+    } else {
+      const s = String(v).trim();
+      dto.name = s.length === 0 ? null : s;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "fullName")) {
+    dto.fullName =
+      body.fullName === null || body.fullName === undefined
+        ? undefined
+        : String(body.fullName);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "active")) {
+    dto.active = Boolean(body.active);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "roleIds")) {
+    const r = body.roleIds;
+    if (Array.isArray(r)) {
+      const seen = new Set<number>();
+      const ids: number[] = [];
+      for (const x of r) {
+        const n = typeof x === "number" ? x : Number(x);
+        if (!Number.isInteger(n) || n < 1 || seen.has(n)) continue;
+        seen.add(n);
+        ids.push(n);
+      }
+      dto.roleIds = ids;
+    } else if (r === null) {
+      dto.roleIds = [];
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "suiteNavGrants")) {
+    dto.suiteNavGrants = body.suiteNavGrants;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "suiteAgentMonthlyTokenLimit")) {
+    dto.suiteAgentMonthlyTokenLimit =
+      body.suiteAgentMonthlyTokenLimit === null || body.suiteAgentMonthlyTokenLimit === ""
+        ? null
+        : Number(body.suiteAgentMonthlyTokenLimit);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "accessExpiresAt")) {
+    const v = body.accessExpiresAt;
+    dto.accessExpiresAt =
+      v === null || v === undefined || v === "" ? null : typeof v === "string" ? v : String(v);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "companyId")) {
+    const v = body.companyId;
+    dto.companyId = v === null || v === undefined || v === "" ? undefined : String(v);
+  }
+}
+
 @Controller("users")
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles("ADMIN_DEV", "ADMIN")
@@ -64,31 +120,12 @@ export class UsersController {
     @Req() req: Request,
     @CurrentUser() actor: AuthUserPayload,
   ) {
-    const body = req.body as Record<string, unknown>;
-    if (Object.prototype.hasOwnProperty.call(body, "fullName")) {
-      dto.fullName =
-        body.fullName === null || body.fullName === undefined
-          ? undefined
-          : String(body.fullName);
-    }
-    if (Object.prototype.hasOwnProperty.call(body, "suiteNavGrants")) {
-      dto.suiteNavGrants = body.suiteNavGrants;
-    }
-    if (Object.prototype.hasOwnProperty.call(body, "suiteAgentMonthlyTokenLimit")) {
-      dto.suiteAgentMonthlyTokenLimit =
-        body.suiteAgentMonthlyTokenLimit === null || body.suiteAgentMonthlyTokenLimit === ""
-          ? null
-          : Number(body.suiteAgentMonthlyTokenLimit);
-    }
-    if (Object.prototype.hasOwnProperty.call(body, "accessExpiresAt")) {
-      const v = body.accessExpiresAt;
-      dto.accessExpiresAt =
-        v === null || v === undefined || v === "" ? null : typeof v === "string" ? v : String(v);
-    }
-    if (Object.prototype.hasOwnProperty.call(body, "companyId")) {
-      const v = body.companyId;
-      dto.companyId = v === null || v === undefined || v === "" ? undefined : String(v);
-    }
+    const raw = req.body;
+    const body: Record<string, unknown> =
+      raw != null && typeof raw === "object" && !Array.isArray(raw)
+        ? (raw as Record<string, unknown>)
+        : {};
+    mergeUpdateUserDtoFromBody(dto, body);
     return this.usersService.update(id, dto, actor);
   }
 

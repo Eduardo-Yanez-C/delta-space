@@ -1,7 +1,7 @@
 // Base URL del API. En build time se usa env o fallback; en runtime (navegador) se usa la config local si existe.
 import { getLocalConfig } from "./local-config";
-import { getLanRouting, normalizeApiBase } from "./lan-routing";
-import { nestHttpErrorMessage } from "./nest-http-error-message";
+import { clearLanPeerRouting, getLanRouting, normalizeApiBase } from "./lan-routing";
+import { nestHttpErrorMessage, parseFetchBodyAsNestJson } from "./nest-http-error-message";
 
 /** Debe coincidir con `PROD_PORT` en apps/desktop/main.js (Next dentro del .exe). */
 const DESKTOP_PACKAGED_WEB_PORT = "31337";
@@ -32,9 +32,45 @@ export function isDesktopPackagedWebShell(): boolean {
 export function isLikelyLocalApiBase(base: string): boolean {
   try {
     const u = new URL(base.includes("://") ? base : `http://${base}`);
-    return u.hostname === "localhost" || u.hostname === "127.0.0.1";
+    return (
+      u.hostname === "localhost" ||
+      u.hostname === "127.0.0.1" ||
+      u.hostname === "[::1]" ||
+      u.hostname === "::1"
+    );
   } catch {
     return false;
+  }
+}
+
+/** Página servida desde loopback (dev típico en este equipo). */
+function isPageHostnameLoopback(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname === "::1"
+  );
+}
+
+const INSTALL_CONFIG_STORAGE_KEY = "pv_quoting_install_config";
+
+/**
+ * Si el usuario abrió /setup en dev en el mismo perfil de Chrome y guardó API loopback,
+ * al entrar en Vercel/producción esa URL apunta al PC equivocado. Se elimina la entrada entera.
+ */
+function stripStaleLoopbackInstallConfig(hostname: string): void {
+  if (typeof window === "undefined") return;
+  if (isPageHostnameLoopback(hostname)) return;
+  try {
+    const raw = window.localStorage.getItem(INSTALL_CONFIG_STORAGE_KEY);
+    if (!raw) return;
+    const o = JSON.parse(raw) as { apiBaseUrl?: string };
+    const b = typeof o?.apiBaseUrl === "string" ? normalizeApiBase(o.apiBaseUrl) : "";
+    if (!b || !isLikelyLocalApiBase(b)) return;
+    window.localStorage.removeItem(INSTALL_CONFIG_STORAGE_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -46,12 +82,17 @@ export function isLikelyLocalApiBase(base: string): boolean {
  *
  * Navegador:
  * - Si hay peer manual en `pv_quoting_lan_routing` → esa URL (excepto en `next dev` en localhost: ver abajo).
- * - Si no → config /setup (on-prem) → env fallback.
+ * - Si no → config /setup (`pv_quoting_install_config`) → env fallback.
+ *
+ * **Producción en Vercel / dominio público:** si en localStorage quedó `http://localhost:4000/api` desde un dev
+ * en el mismo navegador, **no** se usa: el fetch iría al PC del usuario, no a Railway. En ese caso se usa
+ * `NEXT_PUBLIC_API_BASE_URL` del build.
  * No hay elección automática de líder LAN ni caché compartida entre equipos.
  */
 export function getApiBase(): string {
   if (typeof window !== "undefined") {
     const { hostname } = window.location;
+    stripStaleLoopbackInstallConfig(hostname);
     if (isDesktopPackagedWebShell()) {
       const lanPackaged = getLanRouting();
       if (lanPackaged.mode === "lan_peer" && lanPackaged.peerBaseUrl) {
@@ -69,15 +110,32 @@ export function getApiBase(): string {
     if (isLocalNextDev) {
       return normalizeApiBase(FALLBACK_API_BASE);
     }
-    const lanBrowser = getLanRouting();
+    let lanBrowser = getLanRouting();
+    if (lanBrowser.mode === "lan_peer" && lanBrowser.peerBaseUrl) {
+      const peerBase = normalizeApiBase(lanBrowser.peerBaseUrl);
+      if (isLikelyLocalApiBase(peerBase) && !isPageHostnameLoopback(hostname)) {
+        clearLanPeerRouting();
+        lanBrowser = getLanRouting();
+      } else {
+        return peerBase;
+      }
+    }
     if (lanBrowser.mode === "lan_peer" && lanBrowser.peerBaseUrl) {
       return normalizeApiBase(lanBrowser.peerBaseUrl);
     }
     /**
-     * En build de producción (`next start`/deploy) sí se respeta la config local para instalaciones on-premise.
+     * On-prem: respeta `pv_quoting_install_config`. En host público, ignora API loopback en localStorage
+     * (resto típico de haber abierto /setup en dev en el mismo perfil de Chrome).
      */
     const c = getLocalConfig();
-    if (c?.apiBaseUrl) return normalizeApiBase(c.apiBaseUrl);
+    if (c?.apiBaseUrl) {
+      const normalized = normalizeApiBase(c.apiBaseUrl);
+      if (isLikelyLocalApiBase(normalized) && !isPageHostnameLoopback(hostname)) {
+        // caer al FALLBACK_API_BASE (NEXT_PUBLIC_* del build)
+      } else {
+        return normalized;
+      }
+    }
   }
   return normalizeApiBase(FALLBACK_API_BASE);
 }
@@ -517,11 +575,17 @@ export type AuditLog = {
 
 export async function fetchCompanies(): Promise<Company[]> {
   const res = await fetch(`${getApiBase()}/companies`, { headers: getAuthHeaders() });
+  const text = await res.text();
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(nestHttpErrorMessage(err, "Error al cargar empresas"));
+    const err = parseFetchBodyAsNestJson(text, res.status);
+    const detail = nestHttpErrorMessage(err, `HTTP ${res.status}`);
+    throw new Error(`Error al cargar empresas (GET /companies): ${detail}`);
   }
-  return res.json();
+  try {
+    return JSON.parse(text) as Company[];
+  } catch {
+    throw new Error("Respuesta de empresas inválida (no es JSON)");
+  }
 }
 
 export async function fetchCompany(id: string): Promise<Company> {
@@ -1337,8 +1401,17 @@ export async function fetchSuiteAgentUsageAdmin(opts: {
 
 export async function fetchRoles(): Promise<Role[]> {
   const res = await fetch(`${getApiBase()}/roles`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error("Error al cargar roles");
-  return res.json();
+  const text = await res.text();
+  if (!res.ok) {
+    const err = parseFetchBodyAsNestJson(text, res.status);
+    const detail = nestHttpErrorMessage(err, `HTTP ${res.status}`);
+    throw new Error(`Error al cargar roles (GET /roles): ${detail}`);
+  }
+  try {
+    return JSON.parse(text) as Role[];
+  } catch {
+    throw new Error("Respuesta de roles inválida (no es JSON)");
+  }
 }
 export async function fetchUsers(activeOnly?: boolean): Promise<User[]> {
   const q = activeOnly === true ? "?activeOnly=true" : "";
@@ -1361,12 +1434,17 @@ export async function fetchAssignableSalesUsers(activeOnly?: boolean): Promise<U
 }
 export async function fetchUser(id: string): Promise<User> {
   const res = await fetch(`${getApiBase()}/users/${id}`, { headers: getAuthHeaders() });
+  const text = await res.text();
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    const err = parseFetchBodyAsNestJson(text, res.status);
     if (res.status === 404) throw new Error("Usuario no encontrado");
-    throw new Error(nestHttpErrorMessage(err, "Error al cargar usuario"));
+    throw new Error(nestHttpErrorMessage(err, `Error al cargar usuario (HTTP ${res.status})`));
   }
-  return res.json();
+  try {
+    return JSON.parse(text) as User;
+  } catch {
+    throw new Error("Respuesta del servidor no es JSON válido al cargar usuario.");
+  }
 }
 export async function createUser(data: CreateUserInput): Promise<User> {
   const res = await fetch(`${getApiBase()}/users`, {
@@ -1386,11 +1464,18 @@ export async function updateUser(id: string, data: UpdateUserInput): Promise<Use
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
+  const text = await res.text();
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(nestHttpErrorMessage(err, "Error al actualizar usuario"));
+    const err = parseFetchBodyAsNestJson(text, res.status);
+    throw new Error(
+      nestHttpErrorMessage(err, `Error al actualizar usuario (HTTP ${res.status})`),
+    );
   }
-  return res.json();
+  try {
+    return JSON.parse(text) as User;
+  } catch {
+    throw new Error("Respuesta del servidor no es JSON válido al actualizar usuario.");
+  }
 }
 export async function activateUser(id: string): Promise<User> {
   const res = await fetch(`${getApiBase()}/users/${id}/activate`, { method: "PATCH", headers: getAuthHeaders() });

@@ -1,0 +1,27 @@
+# Archivo para `railway up`: excluir lo pesado y evitar 413 Payload Too Large.
+# (`.dockerignore` no aplica al empaquetado del CLI.)
+
+node_modules
+**/node_modules
+.git
+.github
+**/.next
+**/out
+**/dist
+apps/desktop/dist
+apps/lan-p2p/target
+**/target
+**/*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.cursor
+**/.cursor
+terminals
+coverage
+.nyc_output
+.vercel
+**/__stale__*
+*.md
+Thumbs.db
+*.log

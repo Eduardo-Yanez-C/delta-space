@@ -157,17 +157,27 @@ export function useLanConnectivity(): UseLanConnectivityResult {
       ? "Sin conexión con la aplicación"
       : conn === "lan_peer"
         ? "Nodo de datos remoto (supervisión)"
-        : "Nodo de datos: este equipo";
+        : conn === "other"
+          ? "API en servidor (nube o red)"
+          : "Nodo de datos: este equipo";
 
   const shortBadge =
-    conn === "offline" ? "Sin conexión" : conn === "lan_peer" ? "Nodo remoto" : "Local";
+    conn === "offline"
+      ? "Sin conexión"
+      : conn === "lan_peer"
+        ? "Nodo remoto"
+        : conn === "other"
+          ? "Nube"
+          : "Local";
 
   const badgeColor =
     conn === "offline"
       ? "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
       : conn === "lan_peer"
         ? "border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-700 dark:bg-violet-950/50 dark:text-violet-100"
-        : "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-100";
+        : conn === "other"
+          ? "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-700 dark:bg-sky-950/50 dark:text-sky-100"
+          : "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-100";
 
   const connectToPeer = useCallback(
     async (
