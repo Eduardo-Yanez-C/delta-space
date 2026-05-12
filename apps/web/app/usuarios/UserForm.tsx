@@ -91,7 +91,10 @@ export function UserForm(props: Props) {
     password: "",
     name: isEdit && initialUser ? initialUser.name ?? "" : "",
     fullName: isEdit && initialUser ? (initialUser.fullName ?? "") : "",
-    roleIds: isEdit && initialUser ? (initialUser.roles?.map((r) => r.id) ?? []) : [],
+    roleIds: isEdit && initialUser
+      ? (initialUser.roles?.map((r) => r.id).filter((id): id is number => typeof id === "number" && Number.isInteger(id)) ??
+        [])
+      : [],
     active: isEdit && initialUser ? initialUser.active : true,
     iaTokenLimit: iaLimitFromUser(initialUser),
     licenseUnlimited: !initialUser?.accessExpiresAt,
@@ -105,13 +108,13 @@ export function UserForm(props: Props) {
   useEffect(() => {
     fetchRoles()
       .then(setRoles)
-      .catch(() => setError("Error al cargar roles"));
+      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar roles"));
   }, []);
 
   useEffect(() => {
     fetchCompanies()
       .then(setCompanies)
-      .catch(() => setError("Error al cargar empresas"));
+      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar empresas"));
   }, []);
 
   useEffect(() => {
@@ -121,7 +124,7 @@ export function UserForm(props: Props) {
         password: "",
         name: initialUser.name ?? "",
         fullName: initialUser.fullName ?? "",
-        roleIds: initialUser.roles?.map((r) => r.id) ?? [],
+        roleIds: initialUser.roles?.map((r) => r.id).filter((id): id is number => typeof id === "number" && Number.isInteger(id)) ?? [],
         active: initialUser.active,
         iaTokenLimit: iaLimitFromUser(initialUser),
         licenseUnlimited: !initialUser.accessExpiresAt,

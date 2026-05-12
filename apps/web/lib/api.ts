@@ -1362,8 +1362,9 @@ export async function fetchAssignableSalesUsers(activeOnly?: boolean): Promise<U
 export async function fetchUser(id: string): Promise<User> {
   const res = await fetch(`${getApiBase()}/users/${id}`, { headers: getAuthHeaders() });
   if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
     if (res.status === 404) throw new Error("Usuario no encontrado");
-    throw new Error("Error al cargar usuario");
+    throw new Error(nestHttpErrorMessage(err, "Error al cargar usuario"));
   }
   return res.json();
 }

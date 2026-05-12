@@ -207,6 +207,7 @@ export default function EditarUsuarioPage() {
                     : undefined,
                 active: data.active,
                 roleIds: data.roleIds,
+                companyId: data.companyId,
                 suiteNavGrants: data.suiteNavGrants,
                 suiteAgentMonthlyTokenLimit: data.suiteAgentMonthlyTokenLimit,
                 accessExpiresAt: data.accessExpiresAt,

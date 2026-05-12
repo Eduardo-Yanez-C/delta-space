@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
@@ -82,8 +83,17 @@ function toUserResponse(user: {
   suiteNavGrants?: string | null;
   suiteAgentMonthlyTokenLimit?: number | null;
   accessExpiresAt?: Date | null;
-  roles: { role: Role }[];
+  roles: { role: Role | null }[];
 }): UserResponse {
+  const roles: Role[] = [];
+  for (const ur of user.roles) {
+    if (!ur?.role) continue;
+    roles.push({
+      id: ur.role.id,
+      name: ur.role.name,
+      description: ur.role.description ?? null,
+    });
+  }
   return {
     id: user.id,
     email: user.email,
@@ -91,7 +101,7 @@ function toUserResponse(user: {
     fullName: user.fullName ?? null,
     active: user.active,
     companyId: user.companyId,
-    roles: user.roles.map((ur) => ur.role),
+    roles,
     suiteNavGrants: parseGrantsColumn(user.suiteNavGrants),
     suiteAgentMonthlyTokenLimit:
       user.suiteAgentMonthlyTokenLimit === undefined || user.suiteAgentMonthlyTokenLimit === null
@@ -103,8 +113,25 @@ function toUserResponse(user: {
   };
 }
 
+/** Enteros de rol positivos, sin duplicados (evita P2002 en UserRole al guardar). */
+function sanitizeRoleIds(raw: number[] | undefined): number[] {
+  if (!raw?.length) return [];
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const v of raw) {
+    const n = typeof v === "number" ? v : Number(v);
+    if (!Number.isInteger(n) || n < 1) continue;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
+}
+
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
@@ -198,15 +225,16 @@ export class UsersService {
   }
 
   async validateRoleIds(roleIds: number[]) {
-    if (roleIds.length === 0) {
+    const clean = sanitizeRoleIds(roleIds);
+    if (clean.length === 0) {
       return;
     }
     const found = await this.prisma.role.findMany({
-      where: { id: { in: roleIds } },
+      where: { id: { in: clean } },
       select: { id: true },
     });
     const foundIds = new Set(found.map((r) => r.id));
-    const missing = roleIds.filter((id) => !foundIds.has(id));
+    const missing = clean.filter((id) => !foundIds.has(id));
     if (missing.length > 0) {
       throw new BadRequestException(
         `Los siguientes IDs de rol no existen: ${missing.join(", ")}. Use GET /api/roles para listar roles válidos.`,
@@ -231,7 +259,7 @@ export class UsersService {
     if (existing) {
       throw new ConflictException("Ya existe un usuario con ese email");
     }
-    const roleIds = dto.roleIds ?? [];
+    const roleIds = sanitizeRoleIds(dto.roleIds ?? []);
     await this.validateRoleIds(roleIds);
     await this.assertRoleAssignmentAllowed(actor, roleIds);
     const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
@@ -273,6 +301,7 @@ export class UsersService {
     if (roleIds.length > 0) {
       await this.prisma.userRole.createMany({
         data: roleIds.map((roleId) => ({ userId: user.id, roleId })),
+        skipDuplicates: true,
       });
     }
     return this.findOne(user.id);
@@ -288,9 +317,11 @@ export class UsersService {
     }
     const targetResponse = toUserResponse(user);
     this.assertCanMutateUserRecord(actor, targetResponse);
+    let sanitizedRoleIds: number[] | undefined;
     if (dto.roleIds !== undefined) {
-      await this.validateRoleIds(dto.roleIds);
-      await this.assertRoleAssignmentAllowed(actor, dto.roleIds);
+      sanitizedRoleIds = sanitizeRoleIds(dto.roleIds);
+      await this.validateRoleIds(sanitizedRoleIds);
+      await this.assertRoleAssignmentAllowed(actor, sanitizedRoleIds);
     }
     const scalarData: {
       name?: string | null;
@@ -339,28 +370,35 @@ export class UsersService {
           data: scalarData,
         });
       }
-      if (dto.roleIds !== undefined) {
+      if (sanitizedRoleIds !== undefined) {
         await tx.userRole.deleteMany({ where: { userId: id } });
-        if (dto.roleIds.length > 0) {
+        if (sanitizedRoleIds.length > 0) {
           await tx.userRole.createMany({
-            data: dto.roleIds.map((roleId) => ({ userId: id, roleId })),
+            data: sanitizedRoleIds.map((roleId) => ({ userId: id, roleId })),
+            skipDuplicates: true,
           });
         }
       }
     });
     const after = await this.findOne(id);
-    await this.audit.write(actor, {
-      action: "UPDATE",
-      entityType: "User",
-      entityId: id,
-      entityCompanyId: after.companyId,
-      before: targetResponse,
-      after,
-      meta: {
-        changed: Object.keys(scalarData),
-        roleIds: dto.roleIds !== undefined ? dto.roleIds : undefined,
-      },
-    });
+    try {
+      await this.audit.write(actor, {
+        action: "UPDATE",
+        entityType: "User",
+        entityId: id,
+        entityCompanyId: after.companyId,
+        before: targetResponse,
+        after,
+        meta: {
+          changed: Object.keys(scalarData),
+          roleIds: sanitizedRoleIds,
+        },
+      });
+    } catch (e) {
+      this.logger.warn(
+        `AuditLog omitido tras actualizar usuario ${id}: ${e instanceof Error ? e.message : e}`,
+      );
+    }
     return after;
   }
 
