@@ -370,26 +370,26 @@ export class UsersService {
       scalarData.companyId = companyId;
     }
     try {
-      // Prisma interactive tx default timeout is 5000 ms; Supabase/Railway latency often exceeds that here → 500.
-      await this.prisma.$transaction(
-        async (tx) => {
-          if (Object.keys(scalarData).length > 0) {
-            await tx.user.update({
-              where: { id },
-              data: scalarData,
-            });
-          }
-          if (sanitizedRoleIds !== undefined) {
-            await tx.userRole.deleteMany({ where: { userId: id } });
-            if (sanitizedRoleIds.length > 0) {
-              await tx.userRole.createMany({
-                data: sanitizedRoleIds.map((roleId) => ({ userId: id, roleId })),
-              });
-            }
-          }
-        },
-        { maxWait: 15_000, timeout: 30_000 },
-      );
+      // Evitar transacción interactiva (`$transaction(async tx => …)`): con Supabase/Railway suele
+      // agotar el timeout del motor interactivo (P2028) aunque la BD tarde poco. El array de
+      // operaciones corre en una sola transacción SQL sin ese límite artificial.
+      const steps: Prisma.PrismaPromise<unknown>[] = [];
+      if (Object.keys(scalarData).length > 0) {
+        steps.push(this.prisma.user.update({ where: { id }, data: scalarData }));
+      }
+      if (sanitizedRoleIds !== undefined) {
+        steps.push(this.prisma.userRole.deleteMany({ where: { userId: id } }));
+        if (sanitizedRoleIds.length > 0) {
+          steps.push(
+            this.prisma.userRole.createMany({
+              data: sanitizedRoleIds.map((roleId) => ({ userId: id, roleId })),
+            }),
+          );
+        }
+      }
+      if (steps.length > 0) {
+        await this.prisma.$transaction(steps);
+      }
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
         this.logger.error(`[update user ${id}] Prisma ${e.code}: ${e.message}`, e.stack);
