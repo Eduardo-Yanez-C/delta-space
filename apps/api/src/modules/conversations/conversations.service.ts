@@ -1056,21 +1056,18 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
         );
       }
     }
-    const conv = await this.prisma.$transaction(async (tx) => {
-      const c = await tx.conversation.create({
-        data: {
-          type: dto.type,
-          title: dto.type === "GROUP" ? dto.title!.trim() : null,
-          createdById,
-          members: {
-            create: allMemberIds.map((userId) => ({
-              userId,
-              lastReadAt: null,
-            })),
-          },
+    const conv = await this.prisma.conversation.create({
+      data: {
+        type: dto.type,
+        title: dto.type === "GROUP" ? dto.title!.trim() : null,
+        createdById,
+        members: {
+          create: allMemberIds.map((userId) => ({
+            userId,
+            lastReadAt: null,
+          })),
         },
-      });
-      return c;
+      },
     });
     return this.mapConversationDetail(conv.id, createdById);
   }
@@ -1768,40 +1765,42 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
       .map((m) => m.userId)
       .filter((id) => id !== authorId);
 
-    const msg = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.message.create({
-        data: {
-          conversationId,
-          authorId,
-          body: trimmed,
-          kind: hasSharedEntity ? "SHARED_ENTITY" : "TEXT",
-          metadataJson,
-        },
-      });
-      if (dto.sharedEntity) {
-        await tx.messageSharedEntity.create({
-          data: {
-            messageId: created.id,
-            entityType: dto.sharedEntity.entityType,
-            snapshotJson: JSON.stringify(dto.sharedEntity.snapshot),
-            proposedImportJson: JSON.stringify(dto.sharedEntity.proposedImport),
-            sourceEntityId: dto.sharedEntity.sourceEntityId?.trim() || null,
-            sourceUserId: authorId,
-            sourceUserName: authUser.fullName ?? authUser.name ?? authUser.email,
-            sourceNodeName: this.currentNodeName(),
-          },
-        });
-        if (receiverIds.length > 0) {
-          await tx.sharedEntityImportDecision.createMany({
-            data: receiverIds.map((receiverUserId) => ({
-              messageId: created.id,
-              receiverUserId,
-              status: "PENDING",
-            })),
-          });
-        }
-      }
-      return created;
+    // Una sola sentencia con writes anidados: evita $transaction interactivo (timeout 5s con latencia Supabase).
+    const msg = await this.prisma.message.create({
+      data: {
+        conversationId,
+        authorId,
+        body: trimmed,
+        kind: hasSharedEntity ? "SHARED_ENTITY" : "TEXT",
+        metadataJson,
+        ...(dto.sharedEntity
+          ? {
+              sharedEntity: {
+                create: {
+                  entityType: dto.sharedEntity.entityType,
+                  snapshotJson: JSON.stringify(dto.sharedEntity.snapshot),
+                  proposedImportJson: JSON.stringify(dto.sharedEntity.proposedImport),
+                  sourceEntityId: dto.sharedEntity.sourceEntityId?.trim() || null,
+                  sourceUserId: authorId,
+                  sourceUserName: authUser.fullName ?? authUser.name ?? authUser.email,
+                  sourceNodeName: this.currentNodeName(),
+                },
+              },
+              ...(receiverIds.length > 0
+                ? {
+                    importDecisions: {
+                      createMany: {
+                        data: receiverIds.map((receiverUserId) => ({
+                          receiverUserId,
+                          status: "PENDING",
+                        })),
+                      },
+                    },
+                  }
+                : {}),
+            }
+          : {}),
+      },
     });
     await this.prisma.conversation.update({
       where: { id: conversationId },
@@ -2314,26 +2313,22 @@ export class ConversationsService implements OnModuleInit, OnModuleDestroy {
     });
     let msg;
     try {
-      msg = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.message.create({
-          data: {
-            conversationId,
-            authorId,
-            kind: "FILE",
-            body: caption,
-            metadataJson,
+      msg = await this.prisma.message.create({
+        data: {
+          conversationId,
+          authorId,
+          kind: "FILE",
+          body: caption,
+          metadataJson,
+          attachments: {
+            create: {
+              originalFileName: safeOriginal,
+              mimeType: contentType,
+              sizeBytes: fileSize,
+              storagePath: storageKey,
+            },
           },
-        });
-        await tx.messageAttachment.create({
-          data: {
-            messageId: created.id,
-            originalFileName: safeOriginal,
-            mimeType: contentType,
-            sizeBytes: fileSize,
-            storagePath: storageKey,
-          },
-        });
-        return created;
+        },
       });
     } catch (e) {
       await this.objectStorage.removeObject(storageKey);
