@@ -16,11 +16,44 @@ function normalizeSlug(raw: string) {
     .replace(/[^a-z0-9-]/g, "");
 }
 
+/** Misma lista que `prisma/migrations/20260508140000_seed_product_categories/migration.sql`. */
+const DEFAULT_PRODUCT_CATEGORIES: ReadonlyArray<{ name: string; slug: string }> = [
+  { name: "Paneles fotovoltaicos", slug: "paneles-fotovoltaicos" },
+  { name: "Inversores on-grid", slug: "inversores-on-grid" },
+  { name: "Inversores híbridos", slug: "inversores-hibridos" },
+  { name: "Inversores off-grid", slug: "inversores-off-grid" },
+  { name: "Baterías", slug: "baterias" },
+  { name: "Estructuras", slug: "estructuras" },
+  { name: "Protecciones AC", slug: "protecciones-ac" },
+  { name: "Protecciones DC", slug: "protecciones-dc" },
+  { name: "Cables", slug: "cables" },
+  { name: "Conectores", slug: "conectores" },
+  { name: "Tableros", slug: "tableros" },
+  { name: "Monitoreo", slug: "monitoreo" },
+  { name: "Mano de obra", slug: "mano-de-obra" },
+  { name: "Ingeniería", slug: "ingenieria" },
+  { name: "Transporte", slug: "transporte" },
+  { name: "Obras civiles", slug: "obras-civiles" },
+  { name: "Permisos", slug: "permisos" },
+  { name: "Otros", slug: "otros" },
+];
+
 @Injectable()
 export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Si la BD nunca recibió seed ni la migración de categorías, el catálogo queda vacío; rellenamos una sola vez (idempotente). */
+  private async ensureDefaultProductCategories(): Promise<void> {
+    const n = await this.prisma.productCategory.count();
+    if (n > 0) return;
+    await this.prisma.productCategory.createMany({
+      data: [...DEFAULT_PRODUCT_CATEGORIES],
+      skipDuplicates: true,
+    });
+  }
+
   async findAll(includeChildren = true) {
+    await this.ensureDefaultProductCategories();
     return this.prisma.productCategory.findMany({
       orderBy: { name: "asc" },
       include: includeChildren ? { children: true } : undefined,
